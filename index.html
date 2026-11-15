@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tree Ring Counter</title>
+<style>
+  :root{
+    --bg:#f6f4ef; --card:#ffffff; --ink:#1f2a1f; --muted:#5f6b5f; --line:#d9d5ca;
+    --accent:#2f6b3a; --accent-ink:#ffffff; --warn:#a4512b; --soft:#eef3ec;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#141815; --card:#1d221e; --ink:#e7ece6; --muted:#9aa69a; --line:#323a33; --accent:#6fb27c; --accent-ink:#0f1410; --warn:#e08a5f; --soft:#212a23; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45}
+  header{padding:18px 16px 6px;max-width:980px;margin:0 auto}
+  h1{font-size:1.35rem;margin:0 0 2px}
+  header p{margin:0;color:var(--muted);font-size:.92rem}
+  main{max-width:980px;margin:0 auto;padding:8px 16px 40px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+  .card{min-width:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .steps{display:flex;gap:6px;flex-wrap:wrap;font-size:.82rem}
+  .step{padding:4px 10px;border-radius:999px;background:var(--soft);color:var(--muted)}
+  .step.on{background:var(--accent);color:var(--accent-ink)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  button,.filebtn{font:inherit;font-size:.92rem;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:9px;padding:8px 12px;cursor:pointer}
+  button.primary,.filebtn{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  button.on{outline:2px solid var(--accent);outline-offset:1px}
+  button:disabled{opacity:.45;cursor:default}
+  input[type=file]{display:none}
+  .hint{font-size:.9rem;color:var(--muted);margin:8px 0 0}
+  .hint b{color:var(--ink)}
+  #viewport{position:relative;overflow:auto;height:62vh;max-height:720px;background:#111;border-radius:10px;touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch}
+  #img{display:block;cursor:crosshair}
+  #empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#aaa;text-align:center;padding:20px;font-size:.95rem}
+  .zoom{display:flex;gap:6px;align-items:center;margin-top:8px}
+  .zoom input{flex:1}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  label{font-size:.88rem;color:var(--muted);display:block}
+  label span{color:var(--ink);font-weight:600}
+  label span.lt{color:var(--muted);font-weight:400}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  input[type=number]{font:inherit;width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+  select{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);width:100%}
+  .big{font-size:2.6rem;font-weight:700;line-height:1;color:var(--accent)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:6px}
+  .stat{background:var(--soft);border-radius:10px;padding:10px}
+  .stat .v{font-size:1.25rem;font-weight:700}
+  .stat .k{font-size:.8rem;color:var(--muted)}
+  #profile{width:100%;height:150px;display:block;background:var(--soft);border-radius:8px;cursor:pointer}
+  h2{font-size:1rem;margin:0 0 8px}
+  details summary{cursor:pointer;font-weight:600}
+  ul.tips{margin:8px 0 0;padding-left:18px;font-size:.9rem;color:var(--muted)}
+  #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:9px;font-size:.9rem;opacity:0;transition:opacity .2s;pointer-events:none}
+  #toast.show{opacity:1}
+  .aibox{display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:.92rem}
+  .aibox input{margin-top:3px}
+  textarea{width:100%;height:110px;font-family:ui-monospace,Menlo,monospace;font-size:.8rem;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--ink);padding:8px}
+</style>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2f5e3e">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+</head>
+<body>
+<header>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h1 data-i18n="title">Tree Ring Counter</h1><button id="lang" style="padding:5px 10px;font-size:.85rem">DE</button></div>
+  <p data-i18n="intro">Photo of a cut stump or disc, tap the centre and the bark, and the rings along that line are counted. Fix any misses by tapping.</p>
+</header>
+<main>
+  <div class="card">
+    <div class="steps" id="steps">
+      <div class="step on" data-s="1" data-i18n="s1">1 Photo</div>
+      <div class="step" data-s="2" data-i18n="s2">2 Tap centre (pith)</div>
+      <div class="step" data-s="3" data-i18n="s3">3 Tap bark</div>
+      <div class="step" data-s="4" data-i18n="s4">4 Check rings</div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label class="filebtn" for="file" data-i18n="photo">📷 Take / choose photo</label>
+      <input type="file" id="file" accept="image/*">
+      <button id="demo" data-i18n="demo">Try demo disc</button>
+      <button id="mPith" disabled data-i18n="setC">Set centre</button>
+      <button id="mBark" disabled data-i18n="setB">Set bark</button>
+      <button id="mEdit" disabled data-i18n="edit">Edit rings</button>
+      <button id="mExtra" disabled data-i18n="extraB">+ More directions</button>
+    </div>
+    <label class="aibox"><input type="checkbox" id="ai"><span><b data-i18n="aiL">AI detection</b> <span class="lt" data-i18n="aiD">more accurate, loads ~25 MB once, takes a few seconds per line</span></span></label>
+    <div id="aiStatus" class="hint" style="display:none"></div>
+    <p class="hint" id="hint" data-i18n="hint0">Start with a photo of the cut surface, taken straight on with even light.</p>
+  </div>
+
+  <div class="card">
+    <div id="viewport">
+      <canvas id="img" width="10" height="10"></canvas>
+      <div id="empty" data-i18n-html="empty">No photo yet.<br>Use “Take / choose photo” or try the demo disc.</div>
+    </div>
+    <div class="zoom">
+      <button id="zOut" aria-label="Zoom out">−</button>
+      <input type="range" id="zoom" min="1" max="8" step="0.25" value="1" aria-label="Zoom">
+      <button id="zIn" aria-label="Zoom in">+</button>
+      <button id="zFit" data-i18n="fit">Fit</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="result">Result</h2>
+    <div class="row" style="align-items:flex-end;gap:14px">
+      <div><div class="big" id="count">–</div><div style="color:var(--muted);font-size:.85rem" data-i18n="ringsCounted">rings counted</div></div>
+      <div id="multiRes" style="display:none"><div class="big" id="medCount" style="font-size:1.6rem">–</div><div style="color:var(--muted);font-size:.85rem" id="medLabel"></div><div id="medWarn" class="hint" style="display:none;color:#e0a030"></div></div>
+    </div>
+    <div class="row" id="extraRow" style="display:none;margin-top:6px"><button id="clearExtra" data-i18n="clearExtra">Remove extra directions</button></div>
+    <div class="stats">
+      <div class="stat"><div class="v" id="age">–</div><div class="k" data-i18n="kAge">age at this height (years)</div></div>
+      <div class="stat"><div class="v" id="mean">–</div><div class="k" data-i18n="kMean">mean ring width</div></div>
+      <div class="stat"><div class="v" id="last10">–</div><div class="k" data-i18n="kLast">mean width, last 10 rings</div></div>
+      <div class="stat"><div class="v" id="first10">–</div><div class="k" data-i18n="kFirst">mean width, first 10 rings</div></div>
+    </div>
+    <p class="hint" data-i18n="ageNote">Rings are counted at the height of the cut. For total tree age, add the years the tree needed to grow to that height.</p>
+    <div class="grid2" style="margin-top:10px">
+      <label><span class="lt" data-i18n="lenL">Length centre → bark (cm), optional, for real widths</span>
+        <input type="number" id="lenCm" data-i18n-ph="lenPh" min="0" step="0.1" placeholder="e.g. 18.5">
+      </label>
+      <label><span class="lt" data-i18n="yearL">Year of cutting (optional, to date each ring)</span>
+        <input type="number" id="year" data-i18n-ph="yearPh" min="1000" max="2100" step="1" placeholder="e.g. 2026">
+        <span style="display:flex;gap:8px;align-items:flex-start;margin-top:6px"><input type="checkbox" id="dormant" style="margin-top:3px"><span class="lt" data-i18n="dormL">Felled in the dormant season (Oct–Mar): outermost ring is from the year before</span></span>
+      </label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="copy" disabled data-i18n="copy">Copy table (CSV)</button>
+      <button id="reset" disabled data-i18n="reset">Undo my edits</button>
+    </div>
+    <textarea id="csv" readonly style="display:none;margin-top:8px"></textarea>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="profH">Brightness along the line</h2>
+    <canvas id="profile"></canvas>
+    <p class="hint" data-i18n="profHint">Each vertical tick is a counted ring boundary. In edit mode you can tap here too, to add or remove a ring at that spot.</p>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="setH">Detection settings</h2>
+    <div class="grid2">
+      <label><span class="lt" data-i18n="sensL">Sensitivity:</span> <span id="sensV">55</span>
+        <input type="range" id="sens" min="0" max="100" value="55">
+      </label>
+      <label><span class="lt" data-i18n="spL">Min. ring spacing:</span> <span id="spV">5</span> px
+        <input type="range" id="sp" min="2" max="60" value="5">
+      </label>
+      <label><span class="lt" data-i18n="bwL">Strip width:</span> <span id="bwV">5</span> px
+        <input type="range" id="bw" min="1" max="41" step="2" value="5">
+      </label>
+      <label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="multi" checked style="margin-top:3px"><span class="lt" data-i18n="multiL">Follow each ring across neighbouring rays (recommended)</span></label>
+      <label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="showCurves" checked style="margin-top:3px"><span class="lt" data-i18n="curvesL">Show traced ring curves</span></label>
+      <label><span class="lt" data-i18n="polL">Ring boundary looks</span>
+        <select id="pol">
+          <option value="dark" data-i18n="polD">dark (latewood darker, most trees)</option>
+          <option value="light" data-i18n="polLi">light</option>
+        </select>
+      </label>
+    </div>
+    <p class="hint" id="aiNote" data-i18n="aiNote" style="display:none"></p>
+    <p class="hint" data-i18n="setHint">More sensitivity finds faint rings but also picks up noise. Raise the min. spacing if one ring is counted twice. A wider strip averages out cracks and dirt.</p>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary data-i18n="tipsH">Tips for a good count</summary>
+      <ul class="tips">
+        <li data-i18n="t1">Clean or sand the cut surface. Wetting it with water makes rings much clearer.</li>
+        <li data-i18n="t2">Photograph straight from above, without shadows, and fill the frame.</li>
+        <li data-i18n="t3">Pick a radius without cracks, knots or rot. Rings are often widest on one side, which is fine.</li>
+        <li data-i18n="t4">Zoom in near the bark: the outer rings are the narrowest and easiest to miss.</li>
+        <li data-i18n="t5">Check a second radius and compare. Real rings show up on both.</li>
+        <li data-i18n="t6"></li>
+        <li data-i18n="t7"></li>
+      </ul>
+    </details>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const cv = $('img'), ctx = cv.getContext('2d');
+  const vp = $('viewport');
+  const prof = $('profile'), pctx = prof.getContext('2d');
+
+  // ---------- state ----------
+  let base = null;          // offscreen canvas with the (downscaled) photo
+  let gray = null, W = 0, H = 0;
+  let mode = 'none';        // 'pith' | 'bark' | 'edit'
+  let pith = null, bark = null;
+  let zoom = 1;
+  let signal = null, thr = 0, autoRings = [], rings = [];
+  let manualAdd = [], manualRemove = [];
+  let extras = [];          // extra directions: {pt, count, curves}
+  let ai = null, aiBusy = 0; const aiCache = new Map();
+
+
+  // ---------- language ----------
+  const I18N = {
+    en: {
+      title:'Tree Ring Counter',
+      intro:'Photo of a cut stump or disc, tap the centre and the bark, and the rings along that line are counted. Fix any misses by tapping.',
+      s1:'1 Photo', s2:'2 Tap centre (pith)', s3:'3 Tap bark', s4:'4 Check rings',
+      photo:'📷 Take / choose photo', demo:'Try demo disc', setC:'Set centre', setB:'Set bark', edit:'Edit rings',
+      hint0:'Start with a photo of the cut surface, taken straight on with even light.',
+      empty:'No photo yet.<br>Use “Take / choose photo” or try the demo disc.', fit:'Fit',
+      result:'Result', ringsCounted:'rings counted', kAge:'age at this height (years)', kMean:'mean ring width',
+      kLast:'mean width, last 10 rings', kFirst:'mean width, first 10 rings',
+      ageNote:'Rings are counted at the height of the cut. For total tree age, add the years the tree needed to grow to that height.',
+      lenL:'Length centre → bark (cm), optional, for real widths', lenPh:'e.g. 18.5',
+      yearL:'Year of cutting (optional, to date each ring)', yearPh:'e.g. 2026',
+      copy:'Copy table (CSV)', reset:'Undo my edits',
+      profH:'Ring boundaries along the line',
+      profHint:'This curve shows where the wood turns sharply from dark to light, i.e. ring boundaries. Each tick is one boundary; the outermost ring ends at the bark and is counted too. In edit mode you can tap here to add or remove a boundary.',
+      setH:'Detection settings', sensL:'Sensitivity:', spL:'Min. ring spacing:', bwL:'Strip width:', polL:'Ring boundary is a',
+      multiL:'Follow each ring across neighbouring rays (recommended): only boundaries that continue around the disc count, so stains and cracks drop out and faint rings are found', curvesL:'Show traced ring curves', polD:'dark → light step: conifers (pine, spruce, larch, fir) and most diffuse-porous trees', polLi:'light → dark step: ring-porous trees (oak, ash, elm, chestnut), where the band of large spring pores looks dark',
+      setHint:'More sensitivity finds faint rings but also picks up noise. Raise the min. spacing if one ring is counted twice. A wider strip averages out cracks and dirt.',
+      tipsH:'Tips for a good count',
+      t1:'Clean or sand the cut surface. Wetting it with water makes rings much clearer.',
+      t2:'Photograph straight from above, without shadows, and fill the frame.',
+      t3:'Pick a radius without cracks, knots or rot. Rings are often widest on one side, which is fine.',
+      t4:'Zoom in near the bark: the outer rings are the narrowest and easiest to miss.',
+      t5:'Check a second radius and compare. Real rings show up on both.',
+      t6:'Sand with progressively finer paper (roughly 80 → 400 grit) until the latewood bands are sharp; a chainsaw cut hides narrow rings. A sharp blade cut works too.',
+      t7:'Counting alone can be off: dry years can leave a ring missing on part of the disc, and a summer drought can add a false ring. A true boundary is sharp and runs all the way round; a false one fades out or is a gradual change. Count on 3–4 radii and trust the middle value.',
+      dormL:'Felled in the dormant season (Oct–Mar): outermost ring is from the year before',
+      medWarn:'Directions disagree by {d} rings: likely missing or false rings, a crack, or an off-centre pith on one side. Check the outlier lines.',
+      hPith:'<b>Tap the centre</b> of the rings (the pith). Zoom in for precision.',
+      hBark:'<b>Tap the outer edge</b> of the last ring, just inside the bark. Choose a line without cracks.',
+      hEdit:'<b>Check the ticks.</b> Tap on the line to add a missed ring, tap a tick to remove a wrong one.',
+      badImg:'Could not read that image', demoHas:'Demo disc has {n} rings', short:'Line too short',
+      removed:'Ring removed', added:'Ring added', onLine:'Tap on the yellow line', backAuto:'Back to automatic count',
+      copied:'Table copied', copyManual:'Select all and copy the text below',
+      profEmpty:'Set centre and bark to see the profile', centre:'centre', bark:'bark', other:'DE',
+      extraB:'+ More directions', clearExtra:'Remove extra directions',
+      hExtra:'<b>Tap the bark in other directions</b> (avoid cracks). Each line is counted on its own; the middle value of all lines is the most reliable count.',
+      medLabel:'middle value of {n} directions (range {a}–{b})', aiL:'AI detection', aiD:'more accurate, loads ~25 MB once, takes a few seconds per line',
+      aiLoading:'Loading AI model…', aiReady:'AI model ready', aiFail:'AI model could not be loaded ({e}). Using the classic method.', aiRun:'AI is reading the wood… {p}',
+      aiNote:'AI mode: trained on pine discs and hardwood samples. With AI on, “Sensitivity” and “Min. ring spacing” still apply; strip width and boundary type do not.'
+    },
+    de: {
+      title:'Jahrringzähler',
+      intro:'Foto von einem Stubben oder einer Stammscheibe machen, Mitte und Rinde antippen, und die Jahrringe entlang der Linie werden gezählt. Fehler korrigierst du per Antippen.',
+      s1:'1 Foto', s2:'2 Mitte (Mark) antippen', s3:'3 Rinde antippen', s4:'4 Ringe prüfen',
+      photo:'📷 Foto aufnehmen / wählen', demo:'Demo-Scheibe testen', setC:'Mitte setzen', setB:'Rinde setzen', edit:'Ringe bearbeiten',
+      hint0:'Starte mit einem Foto der Schnittfläche, gerade von oben und gleichmäßig beleuchtet.',
+      empty:'Noch kein Foto.<br>„Foto aufnehmen / wählen“ oder die Demo-Scheibe testen.', fit:'Einpassen',
+      result:'Ergebnis', ringsCounted:'Jahrringe gezählt', kAge:'Alter auf Schnitthöhe (Jahre)', kMean:'mittlere Jahrringbreite',
+      kLast:'mittlere Breite, letzte 10 Ringe', kFirst:'mittlere Breite, erste 10 Ringe',
+      ageNote:'Gezählt wird auf Höhe des Schnitts. Für das Gesamtalter kommen die Jahre dazu, die der Baum bis zu dieser Höhe gebraucht hat.',
+      lenL:'Länge Mitte → Rinde (cm), optional, für echte Breiten', lenPh:'z.B. 18,5',
+      yearL:'Fälljahr (optional, um jeden Ring zu datieren)', yearPh:'z.B. 2026',
+      copy:'Tabelle kopieren (CSV)', reset:'Meine Änderungen zurücksetzen',
+      profH:'Jahrringgrenzen entlang der Linie',
+      profHint:'Die Kurve zeigt, wo das Holz scharf von dunkel nach hell wechselt, also die Jahrringgrenzen. Jeder Strich ist eine Grenze, der äußerste Ring endet an der Rinde und wird mitgezählt. Im Bearbeiten-Modus kannst du hier tippen, um eine Grenze hinzuzufügen oder zu entfernen.',
+      setH:'Erkennungs-Einstellungen', sensL:'Empfindlichkeit:', spL:'Min. Ringabstand:', bwL:'Streifenbreite:', polL:'Jahrringgrenze ist ein',
+      multiL:'Jeden Ring über benachbarte Strahlen verfolgen (empfohlen): Nur Grenzen, die um die Scheibe weiterlaufen, zählen. Flecken und Risse fallen raus, blasse Ringe werden gefunden', curvesL:'Verfolgte Ringkurven anzeigen', polD:'Sprung dunkel → hell: Nadelholz (Kiefer, Fichte, Lärche, Tanne) und die meisten zerstreutporigen Laubbäume', polLi:'Sprung hell → dunkel: ringporige Laubbäume (Eiche, Esche, Ulme, Edelkastanie), bei denen das Band großer Frühholzporen dunkel wirkt',
+      setHint:'Mehr Empfindlichkeit findet schwache Ringe, erzeugt aber auch Fehltreffer. Min. Abstand erhöhen, wenn ein Ring doppelt gezählt wird. Ein breiterer Streifen gleicht Risse und Schmutz aus.',
+      tipsH:'Tipps für eine gute Zählung',
+      t1:'Schnittfläche säubern oder anschleifen. Mit Wasser angefeuchtet sind die Ringe viel deutlicher.',
+      t2:'Gerade von oben fotografieren, ohne Schatten, Scheibe bildfüllend.',
+      t3:'Einen Radius ohne Risse, Äste oder Fäule wählen. Dass die Ringe auf einer Seite breiter sind, ist normal.',
+      t4:'Nahe der Rinde reinzoomen: Die äußeren Ringe sind am schmalsten und werden am ehesten übersehen.',
+      t5:'Einen zweiten Radius prüfen und vergleichen. Echte Ringe tauchen in beiden auf.',
+      t6:'Mit immer feinerem Papier schleifen (etwa 80 → 400er Körnung), bis die Spätholzbänder scharf sind. Ein Kettensägenschnitt verdeckt schmale Ringe. Ein glatter Klingenschnitt geht auch.',
+      t7:'Reines Zählen kann danebenliegen: In Trockenjahren fehlt ein Ring manchmal auf einem Teil der Scheibe, eine Sommerdürre kann einen falschen Ring erzeugen. Eine echte Grenze ist scharf und läuft ganz herum, eine falsche verblasst oder ist ein allmählicher Übergang. Auf 3–4 Radien zählen und dem Mittelwert trauen.',
+      dormL:'In der Saftruhe gefällt (Okt–März): der äußerste Ring stammt aus dem Vorjahr',
+      medWarn:'Die Richtungen weichen um {d} Ringe ab: wahrscheinlich fehlende oder falsche Ringe, ein Riss oder ein außermittiges Mark auf einer Seite. Die Ausreißer-Linien prüfen.',
+      hPith:'<b>Tippe auf die Mitte</b> der Jahrringe (das Mark). Für mehr Genauigkeit reinzoomen.',
+      hBark:'<b>Tippe auf den äußeren Rand</b> des letzten Rings, knapp innerhalb der Rinde. Eine Linie ohne Risse wählen.',
+      hEdit:'<b>Striche prüfen.</b> Auf die Linie tippen, um einen fehlenden Ring hinzuzufügen, auf einen Strich tippen, um ihn zu entfernen.',
+      badImg:'Bild konnte nicht gelesen werden', demoHas:'Die Demo-Scheibe hat {n} Ringe', short:'Linie zu kurz',
+      removed:'Ring entfernt', added:'Ring hinzugefügt', onLine:'Auf die gelbe Linie tippen', backAuto:'Zurück zur automatischen Zählung',
+      copied:'Tabelle kopiert', copyManual:'Text unten markieren und kopieren',
+      profEmpty:'Mitte und Rinde setzen, um das Profil zu sehen', centre:'Mitte', bark:'Rinde', other:'EN',
+      extraB:'+ Weitere Richtungen', clearExtra:'Weitere Richtungen löschen',
+      hExtra:'<b>Tippe in anderen Richtungen auf die Rinde</b> (Risse meiden). Jede Linie wird einzeln gezählt, der Mittelwert aller Linien ist die verlässlichste Zahl.',
+      medLabel:'Mittelwert aus {n} Richtungen (Spanne {a}–{b})', aiL:'KI-Erkennung', aiD:'genauer, lädt einmalig ca. 25 MB, braucht ein paar Sekunden pro Linie',
+      aiLoading:'KI-Modell wird geladen…', aiReady:'KI-Modell bereit', aiFail:'KI-Modell konnte nicht geladen werden ({e}). Es wird die klassische Methode genutzt.', aiRun:'KI liest das Holz… {p}',
+      aiNote:'KI-Modus: trainiert an Kiefernscheiben und Laubholzproben. „Empfindlichkeit“ und „Min. Ringabstand“ wirken weiter, Streifenbreite und Grenztyp nicht.'
+    }
+  };
+  let lang = 'en';
+  try { lang = localStorage.getItem('ringLang') || ((navigator.language || '').toLowerCase().startsWith('de') ? 'de' : 'en'); } catch (_) { lang = (navigator.language || '').toLowerCase().startsWith('de') ? 'de' : 'en'; }
+  const t = (k, v) => { let s = (I18N[lang] && I18N[lang][k]) || I18N.en[k] || k; if (v) for (const x in v) s = s.replace('{' + x + '}', v[x]); return s; };
+  function applyLang(){
+    document.documentElement.lang = lang;
+    document.title = t('title');
+    document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+    document.querySelectorAll('[data-i18n-html]').forEach(el => el.innerHTML = t(el.dataset.i18nHtml));
+    document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
+    $('lang').textContent = t('other');
+    if (mode !== 'none') setMode(mode);
+    drawProfile(); if (typeof updateResults === 'function' && base) updateResults();
+  }
+  $('lang').addEventListener('click', () => { lang = lang === 'de' ? 'en' : 'de'; try { localStorage.setItem('ringLang', lang); } catch (_) {} applyLang(); });
+
+  const toast = msg => { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 1800); };
+
+  function setStep(n){ document.querySelectorAll('.step').forEach(s => s.classList.toggle('on', +s.dataset.s === n)); }
+  function setMode(m){
+    mode = m;
+    $('mPith').classList.toggle('on', m === 'pith');
+    $('mBark').classList.toggle('on', m === 'bark');
+    $('mEdit').classList.toggle('on', m === 'edit');
+    $('mExtra').classList.toggle('on', m === 'extra');
+    const h = $('hint');
+    if (m === 'pith'){ setStep(2); h.innerHTML = t('hPith'); }
+    else if (m === 'bark'){ setStep(3); h.innerHTML = t('hBark'); }
+    else if (m === 'edit'){ setStep(4); h.innerHTML = t('hEdit'); }
+    else if (m === 'extra'){ setStep(4); h.innerHTML = t('hExtra'); }
+  }
+
+  // ---------- loading ----------
+  function loadFromCanvas(src){
+    const maxDim = 3200;
+    const s = Math.min(1, maxDim / Math.max(src.width, src.height));
+    W = Math.round(src.width * s); H = Math.round(src.height * s);
+    base = document.createElement('canvas'); base.width = W; base.height = H;
+    const b = base.getContext('2d', { willReadFrequently: true });
+    b.drawImage(src, 0, 0, W, H);
+    const d = b.getImageData(0, 0, W, H).data;
+    gray = new Float32Array(W * H);
+    for (let i = 0, j = 0; i < gray.length; i++, j += 4) gray[i] = 0.299 * d[j] + 0.587 * d[j + 1] + 0.114 * d[j + 2];
+    cv.width = W; cv.height = H;
+    $('empty').style.display = 'none';
+    pith = bark = null; rings = []; autoRings = []; manualAdd = []; manualRemove = []; signal = null; curves = []; extras = []; aiCache.clear();
+    ['mPith', 'mBark', 'mEdit'].forEach(id => $(id).disabled = false);
+    $('mBark').disabled = true; $('mEdit').disabled = true; $('mExtra').disabled = true;
+    fit(); setMode('pith'); render(); updateResults();
+  }
+
+  $('file').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const url = URL.createObjectURL(f);
+    const im = new Image();
+    im.onload = () => { loadFromCanvas(im); URL.revokeObjectURL(url); };
+    im.onerror = () => toast(t('badImg'));
+    im.src = url;
+    e.target.value = '';
+  });
+
+  $('demo').addEventListener('click', () => {
+    // synthetic disc: 1200px, ~48 rings with declining width, slight eccentricity and noise
+    const N = 1100, c = document.createElement('canvas'); c.width = c.height = N;
+    const x = c.getContext('2d'); const id = x.createImageData(N, N); const d = id.data;
+    const widths = []; let r = 0, k = 0;
+    while (r < 500){ const w = 22 * Math.exp(-k / 22) + 5 + 3 * Math.sin(k * 1.7); widths.push(w); r += w; k++; }
+    const bounds = []; let acc = 0; for (const w of widths){ acc += w; bounds.push(acc); }
+    const cx = 520, cy = 560, R = bounds[bounds.length - 1];
+    for (let py = 0; py < N; py++) for (let px = 0; px < N; px++){
+      const dx = px - cx, dy = py - cy, ang = Math.atan2(dy, dx);
+      let rr = Math.hypot(dx, dy) * (1 + 0.06 * Math.cos(ang - 0.6)) + 4 * Math.sin(ang * 3);
+      const o = (py * N + px) * 4;
+      if (rr > R + 18){ d[o] = 40; d[o + 1] = 45; d[o + 2] = 38; d[o + 3] = 255; continue; }
+      if (rr > R){ d[o] = 92; d[o + 1] = 66; d[o + 2] = 44; d[o + 3] = 255; continue; }
+      let i = 0; while (bounds[i] < rr) i++;
+      const start = i ? bounds[i - 1] : 0, f = (rr - start) / widths[i];
+      const late = Math.max(0, (f - 0.72) / 0.28);
+      const n = (Math.random() - 0.5) * 22;
+      d[o] = 214 - 85 * late + n; d[o + 1] = 172 - 72 * late + n; d[o + 2] = 120 - 50 * late + n; d[o + 3] = 255;
+    }
+    x.putImageData(id, 0, 0);
+    loadFromCanvas(c);
+    toast(t('demoHas', { n: widths.length }));
+  });
+
+  // ---------- view ----------
+  function fit(){
+    const vw = vp.clientWidth, vh = vp.clientHeight;
+    zoom = 1; $('zoom').value = 1;
+    const s = Math.min(vw / W, vh / H);
+    cv.dataset.fit = s;
+    applyZoom();
+  }
+  function applyZoom(center){
+    const s = +cv.dataset.fit * zoom;
+    const cx = vp.scrollLeft + vp.clientWidth / 2, cy = vp.scrollTop + vp.clientHeight / 2;
+    const oldW = cv.clientWidth || 1;
+    cv.style.width = (W * s) + 'px'; cv.style.height = (H * s) + 'px';
+    const f = (W * s) / oldW;
+    vp.scrollLeft = cx * f - vp.clientWidth / 2; vp.scrollTop = cy * f - vp.clientHeight / 2;
+    render();
+  }
+  $('zoom').addEventListener('input', e => { zoom = +e.target.value; if (base) applyZoom(); });
+  $('zIn').addEventListener('click', () => { zoom = Math.min(8, zoom * 1.5); $('zoom').value = zoom; if (base) applyZoom(); });
+  $('zOut').addEventListener('click', () => { zoom = Math.max(1, zoom / 1.5); $('zoom').value = zoom; if (base) applyZoom(); });
+  $('zFit').addEventListener('click', () => { if (base) fit(); });
+  window.addEventListener('resize', () => { if (base) fit(); drawProfile(); });
+
+  // ---------- geometry ----------
+  function lineGeom(){
+    const dx = bark.x - pith.x, dy = bark.y - pith.y, L = Math.hypot(dx, dy);
+    return { L, ux: dx / L, uy: dy / L, px: -dy / L, py: dx / L };
+  }
+  function sampleGray(x, y){
+    if (x < 0 || y < 0 || x >= W - 1 || y >= H - 1) return NaN;
+    const x0 = x | 0, y0 = y | 0, fx = x - x0, fy = y - y0, i = y0 * W + x0;
+    return gray[i] * (1 - fx) * (1 - fy) + gray[i + 1] * fx * (1 - fy) + gray[i + W] * (1 - fx) * fy + gray[i + W + 1] * fx * fy;
+  }
+
+  // ---------- detection ----------
+  function movingAvg(a, win){
+    const n = a.length, out = new Float32Array(n), h = win >> 1;
+    let s = 0, c = 0, lo = 0, hi = -1;
+    for (let i = 0; i < n; i++){
+      const L = Math.max(0, i - h), R = Math.min(n - 1, i + h);
+      while (hi < R){ hi++; s += a[hi]; c++; }
+      while (lo < L){ s -= a[lo]; lo++; c--; }
+      out[i] = s / c;
+    }
+    return out;
+  }
+  function gaussian(a, sigma){
+    if (sigma < 0.5) return Float32Array.from(a);
+    const r = Math.ceil(sigma * 3), k = []; let ks = 0;
+    for (let i = -r; i <= r; i++){ const v = Math.exp(-i * i / (2 * sigma * sigma)); k.push(v); ks += v; }
+    const n = a.length, out = new Float32Array(n);
+    for (let i = 0; i < n; i++){
+      let s = 0, w = 0;
+      for (let j = -r; j <= r; j++){ const t = i + j; if (t >= 0 && t < n){ s += a[t] * k[j + r]; w += k[j + r]; } }
+      out[i] = s / w;
+    }
+    return out;
+  }
+
+  // derivative profile of one ray from the pith at angle ang, strip-averaged
+  function rayDeriv(ang, n, half, sp, sign){
+    const ux = Math.cos(ang), uy = Math.sin(ang), qx = -uy, qy = ux;
+    const raw = new Float32Array(n + 1), ok = new Uint8Array(n + 1);
+    let mean = 0, cntAll = 0;
+    for (let i = 0; i <= n; i++){
+      let s = 0, c = 0;
+      for (let k = -half; k <= half; k++){
+        const v = sampleGray(pith.x + ux * i + qx * k, pith.y + uy * i + qy * k);
+        if (!isNaN(v)){ s += v; c++; }
+      }
+      if (c){ raw[i] = s / c; ok[i] = 1; mean += raw[i]; cntAll++; }
+    }
+    mean = cntAll ? mean / cntAll : 128;
+    for (let i = 0; i <= n; i++) if (!ok[i]) raw[i] = mean;
+    const sm = gaussian(raw, Math.max(1, sp / 4));
+    const d = new Float32Array(n + 1);
+    for (let i = 1; i < n; i++) d[i] = (ok[i - 1] && ok[i + 1]) ? sign * (sm[i + 1] - sm[i - 1]) / 2 : 0;
+    return d;
+  }
+  function localMax(d, tlow){
+    const out = [];
+    for (let i = 1; i < d.length - 1; i++) if (d[i] > tlow && d[i] > d[i - 1] && d[i] >= d[i + 1]) out.push(i);
+    return out;
+  }
+  function nearestIdx(arr, x){ // arr sorted ascending
+    let lo = 0, hi = arr.length - 1;
+    if (hi < 0) return -1;
+    while (lo < hi){ const m = (lo + hi) >> 1; if (arr[m] < x) lo = m + 1; else hi = m; }
+    if (lo > 0 && Math.abs(arr[lo - 1] - x) <= Math.abs(arr[lo] - x)) return lo - 1;
+    return lo;
+  }
+
+  let curves = [];   // traced ring curves for drawing
+
+  // follow ring boundaries from ray to ray (idea of CS-TRD): a real ring continues
+  // across the neighbouring rays, a stain or crack does not
+  function traceRings(D, K, dth, thr, sp){
+    const R = D.length;
+    const cands = D.map(d => localMax(d, thr * 0.5));
+    const used = cands.map(c => new Uint8Array(c.length));
+    const seeds = [];
+    cands.forEach((c, k) => c.forEach((r, j) => { if (D[k][r] >= thr) seeds.push([D[k][r], k, j]); }));
+    seeds.sort((x, y) => y[0] - x[0]);
+    const maxGap = 3, smin = 0.5, found = [];
+    for (const seed of seeds){
+      const k0 = seed[1], j0 = seed[2];
+      if (used[k0][j0]) continue;
+      const r00 = cands[k0][j0];
+      const w = Math.max(2, sp * 0.6, 0.35 * r00 * dth);
+      const path = new Map([[k0, [r00, j0]]]);
+      for (const dir of [1, -1]){
+        const last = [[k0, r00]]; let gap = 0, k = k0;
+        while (true){
+          k += dir; if (k < 0 || k >= R) break;
+          let pred = last[last.length - 1][1];
+          if (last.length >= 2){
+            const A = last[last.length - 2], B = last[last.length - 1];
+            const slope = Math.max(-w, Math.min(w, (B[1] - A[1]) / (B[0] - A[0])));
+            pred = B[1] + slope * (k - B[0]);
+          }
+          const c = cands[k];
+          let j = nearestIdx(c, pred);
+          if (j >= 0 && used[k][j]){
+            let best = -1, bd = Infinity;
+            for (let q = Math.max(0, j - 3); q <= Math.min(c.length - 1, j + 3); q++){
+              if (!used[k][q] && Math.abs(c[q] - pred) < bd){ bd = Math.abs(c[q] - pred); best = q; }
+            }
+            j = best;
+          }
+          if (j >= 0 && Math.abs(c[j] - pred) <= w){ path.set(k, [c[j], j]); last.push([k, c[j]]); gap = 0; }
+          else if (++gap > maxGap) break;
+        }
+      }
+      if (path.size / R < smin) continue;
+      path.forEach((v, k) => { used[k][v[1]] = 1; });
+      const ks = [...path.keys()].sort((x, y) => x - y);
+      const pts = ks.map(k => [k, path.get(k)[0]]);
+      let r0;
+      if (path.has(K)) r0 = path.get(K)[0];
+      else {
+        let lo = null, hi = null;
+        for (const q of pts){ if (q[0] < K) lo = q; else if (q[0] > K && !hi) hi = q; }
+        r0 = lo && hi ? lo[1] + (hi[1] - lo[1]) * (K - lo[0]) / (hi[0] - lo[0]) : (lo || hi)[1];
+      }
+      found.push({ r0, support: path.size / R, pts });
+    }
+    // drop duplicates and curves that cross better-supported ones
+    found.sort((x, y) => y.support - x.support);
+    const keep = [];
+    for (const c of found){
+      const cm = new Map(c.pts);
+      const ok = keep.every(a => {
+        const diffs = [];
+        for (const q of a.pts) if (cm.has(q[0])) diffs.push(cm.get(q[0]) - q[1]);
+        if (!diffs.length) return Math.abs(c.r0 - a.r0) >= sp * 0.6;
+        const med = diffs.map(Math.abs).sort((x, y) => x - y)[diffs.length >> 1];
+        if (med < sp * 0.6) return false;
+        const pos = diffs.filter(x => x > 1).length / diffs.length, neg = diffs.filter(x => x < -1).length / diffs.length;
+        return Math.min(pos, neg) <= 0.15;
+      });
+      if (ok) keep.push(c);
+    }
+    return keep;
+  }
+
+  // ---------- AI mode (U-Net, onnxruntime-web, files shipped with the page) ----------
+  function loadScript(src){ return new Promise((res, rej) => { const e = document.createElement('script'); e.crossOrigin = 'anonymous'; e.src = src; e.onload = res; e.onerror = () => rej(new Error('script')); document.head.appendChild(e); }); }
+  const TFJS = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js';
+  const MODEL_LAYERS = [{"name":"stem","shape":[7,7,3,64],"stride":2,"pad":3,"q":[0,9408],"s":[9408,256],"b":[9664,256]},{"name":"encoder.layer1.0.c1","shape":[3,3,64,64],"stride":1,"pad":1,"q":[9920,36864],"s":[46784,256],"b":[47040,256]},{"name":"encoder.layer1.0.c2","shape":[3,3,64,64],"stride":1,"pad":1,"q":[47296,36864],"s":[84160,256],"b":[84416,256]},{"name":"encoder.layer1.1.c1","shape":[3,3,64,64],"stride":1,"pad":1,"q":[84672,36864],"s":[121536,256],"b":[121792,256]},{"name":"encoder.layer1.1.c2","shape":[3,3,64,64],"stride":1,"pad":1,"q":[122048,36864],"s":[158912,256],"b":[159168,256]},{"name":"encoder.layer2.0.c1","shape":[3,3,64,128],"stride":2,"pad":1,"q":[159424,73728],"s":[233152,512],"b":[233664,512]},{"name":"encoder.layer2.0.c2","shape":[3,3,128,128],"stride":1,"pad":1,"q":[234176,147456],"s":[381632,512],"b":[382144,512]},{"name":"encoder.layer2.0.ds","shape":[1,1,64,128],"stride":2,"pad":0,"q":[382656,8192],"s":[390848,512],"b":[391360,512]},{"name":"encoder.layer2.1.c1","shape":[3,3,128,128],"stride":1,"pad":1,"q":[391872,147456],"s":[539328,512],"b":[539840,512]},{"name":"encoder.layer2.1.c2","shape":[3,3,128,128],"stride":1,"pad":1,"q":[540352,147456],"s":[687808,512],"b":[688320,512]},{"name":"encoder.layer3.0.c1","shape":[3,3,128,256],"stride":2,"pad":1,"q":[688832,294912],"s":[983744,1024],"b":[984768,1024]},{"name":"encoder.layer3.0.c2","shape":[3,3,256,256],"stride":1,"pad":1,"q":[985792,589824],"s":[1575616,1024],"b":[1576640,1024]},{"name":"encoder.layer3.0.ds","shape":[1,1,128,256],"stride":2,"pad":0,"q":[1577664,32768],"s":[1610432,1024],"b":[1611456,1024]},{"name":"encoder.layer3.1.c1","shape":[3,3,256,256],"stride":1,"pad":1,"q":[1612480,589824],"s":[2202304,1024],"b":[2203328,1024]},{"name":"encoder.layer3.1.c2","shape":[3,3,256,256],"stride":1,"pad":1,"q":[2204352,589824],"s":[2794176,1024],"b":[2795200,1024]},{"name":"encoder.layer4.0.c1","shape":[3,3,256,512],"stride":2,"pad":1,"q":[2796224,1179648],"s":[3975872,2048],"b":[3977920,2048]},{"name":"encoder.layer4.0.c2","shape":[3,3,512,512],"stride":1,"pad":1,"q":[3979968,2359296],"s":[6339264,2048],"b":[6341312,2048]},{"name":"encoder.layer4.0.ds","shape":[1,1,256,512],"stride":2,"pad":0,"q":[6343360,131072],"s":[6474432,2048],"b":[6476480,2048]},{"name":"encoder.layer4.1.c1","shape":[3,3,512,512],"stride":1,"pad":1,"q":[6478528,2359296],"s":[8837824,2048],"b":[8839872,2048]},{"name":"encoder.layer4.1.c2","shape":[3,3,512,512],"stride":1,"pad":1,"q":[8841920,2359296],"s":[11201216,2048],"b":[11203264,2048]},{"name":"dec0.c1","shape":[3,3,768,256],"stride":1,"pad":1,"q":[11205312,1769472],"s":[12974784,1024],"b":[12975808,1024]},{"name":"dec0.c2","shape":[3,3,256,256],"stride":1,"pad":1,"q":[12976832,589824],"s":[13566656,1024],"b":[13567680,1024]},{"name":"dec1.c1","shape":[3,3,384,128],"stride":1,"pad":1,"q":[13568704,442368],"s":[14011072,512],"b":[14011584,512]},{"name":"dec1.c2","shape":[3,3,128,128],"stride":1,"pad":1,"q":[14012096,147456],"s":[14159552,512],"b":[14160064,512]},{"name":"dec2.c1","shape":[3,3,192,64],"stride":1,"pad":1,"q":[14160576,110592],"s":[14271168,256],"b":[14271424,256]},{"name":"dec2.c2","shape":[3,3,64,64],"stride":1,"pad":1,"q":[14271680,36864],"s":[14308544,256],"b":[14308800,256]},{"name":"dec3.c1","shape":[3,3,128,32],"stride":1,"pad":1,"q":[14309056,36864],"s":[14345920,128],"b":[14346048,128]},{"name":"dec3.c2","shape":[3,3,32,32],"stride":1,"pad":1,"q":[14346176,9216],"s":[14355392,128],"b":[14355520,128]},{"name":"dec4.c1","shape":[3,3,32,16],"stride":1,"pad":1,"q":[14355648,4608],"s":[14360256,64],"b":[14360320,64]},{"name":"dec4.c2","shape":[3,3,16,16],"stride":1,"pad":1,"q":[14360384,2304],"s":[14362688,64],"b":[14362752,64]},{"name":"head","shape":[3,3,16,1],"stride":1,"pad":1,"q":[14362816,144],"s":[14362960,4],"b":[14362964,4]}];   // U-Net (ResNet18), BN folded, int8 per output channel
+  async function ensureAI(){
+    if (ai) return ai;
+    const st = $('aiStatus'); st.style.display = 'block'; st.textContent = t('aiLoading');
+    if (!window.tf) await loadScript(TFJS);
+    try { await tf.setBackend('webgl'); } catch (_) {}
+    if (tf.getBackend() !== 'webgl') await tf.setBackend('cpu');
+    await tf.ready();
+    const r = await fetch(new URL('ring_model.bin', location.href));
+    if (!r.ok) throw new Error('model ' + r.status);
+    const buf = await r.arrayBuffer();
+    const L = {};
+    for (const m of MODEL_LAYERS){
+      const q = new Int8Array(buf, m.q[0], m.q[1]), sc = new Float32Array(buf, m.s[0], m.s[1] / 4), bi = new Float32Array(buf.slice(m.b[0], m.b[0] + m.b[1]));
+      const O = m.shape[3], w = new Float32Array(q.length);
+      for (let i = 0; i < q.length; i++) w[i] = q[i] * sc[i % O];
+      L[m.name] = { w: tf.tensor4d(w, m.shape), b: tf.tensor1d(bi), stride: m.stride, pad: m.pad };
+    }
+    const conv = (x, l, relu = true) => {
+      const p = l.pad, y = tf.add(tf.conv2d(x, l.w, l.stride, p ? [[0, 0], [p, p], [p, p], [0, 0]] : 'valid'), l.b);
+      return relu ? tf.relu(y) : y;
+    };
+    const block = (x, p, down) => {
+      let y = conv(x, L[p + '.c1']); y = conv(y, L[p + '.c2'], false);
+      return tf.relu(tf.add(y, down ? conv(x, L[p + '.ds'], false) : x));
+    };
+    ai = {
+      backend: tf.getBackend(),
+      run: (x) => tf.tidy(() => {           // x: [1,H,W,3] in 0..1, H and W multiples of 32
+        const f1 = conv(x, L.stem);
+        let h = tf.maxPool(f1, 3, 2, 1);
+        const l1 = block(block(h, 'encoder.layer1.0', false), 'encoder.layer1.1', false);
+        const l2 = block(block(l1, 'encoder.layer2.0', true), 'encoder.layer2.1', false);
+        const l3 = block(block(l2, 'encoder.layer3.0', true), 'encoder.layer3.1', false);
+        h = block(block(l3, 'encoder.layer4.0', true), 'encoder.layer4.1', false);
+        [l3, l2, l1, f1, null].forEach((skip, i) => {
+          let u = tf.image.resizeNearestNeighbor(h, [h.shape[1] * 2, h.shape[2] * 2]);
+          if (skip) u = tf.concat([u, skip], 3);
+          h = conv(conv(u, L['dec' + i + '.c1']), L['dec' + i + '.c2']);
+        });
+        return tf.sigmoid(conv(h, L.head, false));
+      })
+    };
+    st.textContent = t('aiReady'); setTimeout(() => { if (!aiBusy) st.style.display = 'none'; }, 1500);
+    return ai;
+  }
+  const nextFrame = () => new Promise(r => setTimeout(r, 0));
+  // probability map of ring boundaries for the sector around one line, scaled so the line is tl px long
+  async function aiSector(p, b, tl, progress){
+    const L = Math.hypot(b.x - p.x, b.y - p.y), a0 = Math.atan2(b.y - p.y, b.x - p.x), span = 15;
+    const key = [p.x, p.y, b.x, b.y, tl].map(v => Math.round(v)).join(',');
+    if (aiCache.has(key)) return aiCache.get(key);
+    const xs = [p.x], ys = [p.y];
+    for (let i = 0; i < 9; i++){ const d = (-span - 3 + i * (2 * span + 6) / 8) * Math.PI / 180; xs.push(p.x + Math.cos(a0 + d) * L * 1.05); ys.push(p.y + Math.sin(a0 + d) * L * 1.05); }
+    const m = 20;
+    const x0 = Math.max(0, Math.floor(Math.min(...xs)) - m), y0 = Math.max(0, Math.floor(Math.min(...ys)) - m);
+    const x1 = Math.min(W, Math.floor(Math.max(...xs)) + m), y1 = Math.min(H, Math.floor(Math.max(...ys)) + m);
+    const s = tl / L, cw = Math.max(32, Math.round((x1 - x0) * s)), ch = Math.max(32, Math.round((y1 - y0) * s));
+    const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+    const cx = c.getContext('2d', { willReadFrequently: true }); cx.imageSmoothingQuality = 'high';
+    cx.drawImage(base, x0, y0, x1 - x0, y1 - y0, 0, 0, cw, ch);
+    const px = cx.getImageData(0, 0, cw, ch).data;
+    const T = 512, O = 64, step = T - O;
+    const pos = (n) => { const a = []; for (let v = 0; v < Math.max(1, n - T); v += step) a.push(v); a.push(Math.max(0, n - T)); return [...new Set(a)].sort((u, v) => u - v); };
+    const ty = pos(ch), tx = pos(cw);
+    const out = new Float32Array(cw * ch), wsum = new Float32Array(cw * ch);
+    const win = new Float32Array(T); for (let i = 0; i < T; i++) win[i] = Math.min(i + 1, T - i, O);
+    const inp = new Float32Array(T * T * 3);
+    let done = 0; const total = ty.length * tx.length;
+    for (const oy of ty) for (const ox of tx){
+      inp.fill(0);
+      const h = Math.min(T, ch - oy), w = Math.min(T, cw - ox);
+      for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++){
+        const q = ((oy + yy) * cw + ox + xx) * 4, o = (yy * T + xx) * 3;
+        inp[o] = px[q] / 255; inp[o + 1] = px[q + 1] / 255; inp[o + 2] = px[q + 2] / 255;
+      }
+      const xt = tf.tensor4d(inp, [1, T, T, 3]), yt = ai.run(xt);
+      const pr = await yt.data(); xt.dispose(); yt.dispose();
+      for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++){
+        const wv = win[yy] * win[xx], o = (oy + yy) * cw + ox + xx;
+        out[o] += pr[yy * T + xx] * wv; wsum[o] += wv;
+      }
+      done++; if (progress) progress(done / total); await nextFrame();
+    }
+    for (let i = 0; i < out.length; i++) out[i] /= (wsum[i] || 1);
+    const r = { pr: out, x0, y0, s, cw, ch };
+    aiCache.set(key, r);
+    return r;
+  }
+  function sampleMap(M, X, Y){
+    const x = (X - M.x0) * M.s, y = (Y - M.y0) * M.s;
+    if (x < 0 || y < 0 || x >= M.cw - 1 || y >= M.ch - 1) return 0;
+    const xi = x | 0, yi = y | 0, fx = x - xi, fy = y - yi, i = yi * M.cw + xi, a = M.pr;
+    return a[i] * (1 - fx) * (1 - fy) + a[i + 1] * fx * (1 - fy) + a[i + M.cw] * (1 - fx) * fy + a[i + M.cw + 1] * fx * fy;
+  }
+
+  // count one line pith -> b; returns rings (radii), curves, centre-ray signal, threshold
+  async function analyseLine(b, useAI, progress){
+    const L = Math.hypot(b.x - pith.x, b.y - pith.y), n = Math.floor(L);
+    if (n < 10) return null;
+    const sp = +$('sp').value, sens = +$('sens').value;
+    const multi = useAI || $('multi').checked;
+    const K = multi ? 18 : 0, span = 15 * Math.PI / 180;
+    const a0 = Math.atan2(b.y - pith.y, b.x - pith.x);
+    const dth = K ? span / K : 0;
+    const angs = []; for (let k = 0; k < 2 * K + 1; k++) angs.push(a0 + (k - K) * dth);
+    const minR = Math.max(3, sp * 0.7), maxR = n - 2;
+    let D, thr;
+    const runTrace = (D, thr) => traceRings(D, K, dth, thr, sp).filter(f => f.r0 > minR && f.r0 < maxR).sort((x, y) => x.r0 - y.r0);
+    if (useAI){
+      thr = 0.1 + 0.7 * (1 - Math.max(0, sens - 15) / 100);
+      const raysFrom = M => angs.map(a => { const d = new Float32Array(n + 1), ux = Math.cos(a), uy = Math.sin(a); for (let i = 0; i <= n; i++) d[i] = sampleMap(M, pith.x + ux * i, pith.y + uy * i); return d; });
+      // pass 1 at a fixed scale, pass 2 at a scale where one ring is ~20 px wide
+      let M = await aiSector(pith, b, 700, f => progress && progress(f * 0.5));
+      D = raysFrom(M);
+      const n1 = runTrace(D, thr).length + 1;
+      const tl = Math.min(2600, Math.max(700, 20 * n1));
+      if (tl > 850){ M = await aiSector(pith, b, tl, f => progress && progress(0.5 + f * 0.5)); D = raysFrom(M); }
+    } else {
+      const half = (+$('bw').value - 1) / 2, sign = $('pol').value === 'dark' ? 1 : -1;
+      D = angs.map(a => rayDeriv(a, n, half, sp, sign));
+      // adaptive scale: the strong boundaries on all rays define 1.0
+      const hs = [];
+      for (const d of D) for (const i of localMax(d, 0)) hs.push(d[i]);
+      hs.sort((x, y) => x - y);
+      const ref = hs.length ? hs[Math.min(hs.length - 1, Math.floor(hs.length * 0.9))] : 1;
+      for (const d of D) for (let i = 0; i <= n; i++) d[i] /= (ref || 1);
+      thr = 0.1 + 0.7 * (1 - sens / 100);
+    }
+    let found;
+    if (!multi){
+      found = [];
+      const cand = localMax(D[0], thr).sort((x, y) => D[0][y] - D[0][x]);
+      for (const c of cand) if (found.every(f => Math.abs(f.r0 - c) >= sp)) found.push({ r0: c, support: 1, pts: [[0, c]] });
+      found = found.filter(f => f.r0 > minR && f.r0 < maxR).sort((x, y) => x.r0 - y.r0);
+    } else found = runTrace(D, thr);
+    return {
+      rings: found.map(f => Math.round(f.r0 * 10) / 10),
+      curves: multi ? found.map(f => f.pts.map(q => ({ x: pith.x + Math.cos(angs[q[0]]) * q[1], y: pith.y + Math.sin(angs[q[0]]) * q[1] }))) : [],
+      signal: D[K], thr
+    };
+  }
+
+  let runId = 0;
+  async function withAI(fn){
+    let useAI = $('ai').checked;
+    if (useAI){
+      try { await ensureAI(); }
+      catch (e){ useAI = false; $('ai').checked = false; const st = $('aiStatus'); st.style.display = 'block'; st.textContent = t('aiFail', { e: (e && e.message || e || '').toString().slice(0, 80) }); }
+    }
+    if (useAI) aiBusy++;
+    try { return await fn(useAI); }
+    finally { if (useAI && !--aiBusy) $('aiStatus').style.display = 'none'; }
+  }
+  const showProg = (label) => f => { const st = $('aiStatus'); st.style.display = 'block'; st.textContent = t('aiRun', { p: (label ? label + ' · ' : '') + Math.round(f * 100) + ' %' }); };
+
+  async function detect(){
+    if (!pith || !bark) return;
+    if (Math.hypot(bark.x - pith.x, bark.y - pith.y) < 10){ toast(t('short')); return; }
+    const id = ++runId;
+    const nExtra = extras.length;
+    await withAI(async useAI => {
+      const r = await analyseLine(bark, useAI, useAI ? showProg(nExtra ? '1/' + (nExtra + 1) : '') : null);
+      if (id !== runId || !r) return;
+      autoRings = r.rings; curves = r.curves; signal = r.signal; thr = r.thr;
+      combine();
+      for (let i = 0; i < extras.length; i++){
+        const e = await analyseLine(extras[i].pt, useAI, useAI ? showProg((i + 2) + '/' + (nExtra + 1)) : null);
+        if (id !== runId) return;
+        if (e){ extras[i].count = e.rings.length + 1; extras[i].curves = e.curves; }
+        render(); updateResults();
+      }
+    });
+  }
+  async function addExtra(pt){
+    const ex = { pt, count: null, curves: [] }; extras.push(ex); render(); updateResults();
+    await withAI(async useAI => {
+      const e = await analyseLine(pt, useAI, useAI ? showProg('') : null);
+      if (e){ ex.count = e.rings.length + 1; ex.curves = e.curves; }
+    });
+    render(); updateResults();
+  }
+  function tol(){ return Math.max(3, +$('sp').value / 2); }
+  function combine(){
+    const T = tol();
+    let r = autoRings.filter(t => !manualRemove.some(m => Math.abs(m - t) <= T));
+    r = r.concat(manualAdd);
+    r.sort((a, b) => a - b);
+    rings = r;
+    render(); drawProfile(); updateResults();
+  }
+  function toggleAt(t){
+    if (!signal) return;
+    const T = tol();
+    let best = -1, bd = Infinity;
+    rings.forEach((r, i) => { const d = Math.abs(r - t); if (d < bd){ bd = d; best = i; } });
+    if (best >= 0 && bd <= T){
+      const r = rings[best];
+      const mi = manualAdd.findIndex(m => Math.abs(m - r) < 0.5);
+      if (mi >= 0) manualAdd.splice(mi, 1); else manualRemove.push(r);
+      toast(t('removed'));
+    } else {
+      // snap to the strongest point nearby
+      let s = Math.round(t), bv = -Infinity;
+      for (let i = Math.max(0, s - 3); i <= Math.min(signal.length - 1, s + 3); i++) if (signal[i] > bv){ bv = signal[i]; s = i; }
+      const ri = manualRemove.findIndex(m => Math.abs(m - s) <= T);
+      if (ri >= 0) manualRemove.splice(ri, 1); else manualAdd.push(s);
+      toast(t('added'));
+    }
+    $('reset').disabled = !(manualAdd.length || manualRemove.length);
+    combine();
+  }
+
+  // ---------- interaction ----------
+  let downAt = null;
+  cv.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY }; });
+  cv.addEventListener('pointerup', e => {
+    if (!base || !downAt) return;
+    if (Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 8){ downAt = null; return; } // was a scroll
+    downAt = null;
+    const rect = cv.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * W / rect.width, y = (e.clientY - rect.top) * H / rect.height;
+    if (mode === 'pith'){
+      pith = { x, y }; $('mBark').disabled = false;
+      if (bark){ manualAdd = []; manualRemove = []; detect(); setMode('edit'); } else setMode('bark');
+      render();
+    } else if (mode === 'bark'){
+      bark = { x, y }; manualAdd = []; manualRemove = []; $('reset').disabled = true;
+      $('mEdit').disabled = false; $('mExtra').disabled = false; detect(); setMode('edit');
+    } else if (mode === 'extra' && pith){
+      if (Math.hypot(x - pith.x, y - pith.y) < 10){ toast(t('short')); return; }
+      addExtra({ x, y });
+    } else if (mode === 'edit' && pith && bark){
+      const g = lineGeom(), vx = x - pith.x, vy = y - pith.y;
+      const t = vx * g.ux + vy * g.uy, d = Math.abs(vx * g.px + vy * g.py);
+      const scr = W / rect.width;
+      if (t < 0 || t > g.L || d > 28 * scr){ toast(t('onLine')); return; }
+      toggleAt(t);
+    }
+  });
+  $('mPith').addEventListener('click', () => setMode('pith'));
+  $('mBark').addEventListener('click', () => setMode('bark'));
+  $('mEdit').addEventListener('click', () => { if (bark) setMode('edit'); });
+  $('mExtra').addEventListener('click', () => { if (bark) setMode('extra'); });
+  $('clearExtra').addEventListener('click', () => { extras = []; render(); updateResults(); if (mode === 'extra') setMode('edit'); });
+  $('ai').addEventListener('change', () => { $('aiNote') && ($('aiNote').style.display = $('ai').checked ? 'block' : 'none'); detect(); });
+
+  prof.addEventListener('click', e => {
+    if (!signal || mode !== 'edit') return;
+    const rect = prof.getBoundingClientRect();
+    toggleAt((e.clientX - rect.left) / rect.width * (signal.length - 1));
+  });
+
+  ['sens', 'sp', 'bw'].forEach(id => $(id).addEventListener('input', e => {
+    $(id + 'V').textContent = e.target.value; detect();
+  }));
+  $('pol').addEventListener('change', detect);
+  $('multi').addEventListener('change', detect);
+  $('showCurves').addEventListener('change', render);
+  $('lenCm').addEventListener('input', updateResults);
+  $('year').addEventListener('input', updateResults);
+  $('dormant').addEventListener('change', updateResults);
+  $('reset').addEventListener('click', () => { manualAdd = []; manualRemove = []; $('reset').disabled = true; combine(); toast(t('backAuto')); });
+
+  // ---------- drawing ----------
+  function render(){
+    if (!base) return;
+    ctx.drawImage(base, 0, 0);
+    const k = W / (cv.clientWidth || W); // image px per screen px
+    const dot = (p, col) => {
+      ctx.beginPath(); ctx.arc(p.x, p.y, 7 * k, 0, Math.PI * 2);
+      ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 2 * k; ctx.strokeStyle = '#fff'; ctx.stroke();
+    };
+    if (pith && bark){
+      const g = lineGeom();
+      ctx.lineWidth = 2 * k; ctx.strokeStyle = 'rgba(255,214,0,.95)';
+      ctx.beginPath(); ctx.moveTo(pith.x, pith.y); ctx.lineTo(bark.x, bark.y); ctx.stroke();
+      if ($('showCurves').checked){
+        ctx.lineWidth = 1.5 * k; ctx.strokeStyle = 'rgba(255,63,180,.75)';
+        for (const c of curves){ ctx.beginPath(); c.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke(); }
+      }
+      const len = 10 * k;
+      rings.forEach((t, i) => {
+        const cx = pith.x + g.ux * t, cy = pith.y + g.uy * t;
+        const manual = manualAdd.some(m => Math.abs(m - t) < 0.5);
+        ctx.lineWidth = 4 * k; ctx.strokeStyle = 'rgba(0,0,0,.7)';
+        ctx.beginPath(); ctx.moveTo(cx - g.px * len, cy - g.py * len); ctx.lineTo(cx + g.px * len, cy + g.py * len); ctx.stroke();
+        ctx.lineWidth = 2 * k; ctx.strokeStyle = manual ? '#38e0ff' : '#ff3fb4';
+        ctx.beginPath(); ctx.moveTo(cx - g.px * len, cy - g.py * len); ctx.lineTo(cx + g.px * len, cy + g.py * len); ctx.stroke();
+        if ((i + 1) % 10 === 0){
+          ctx.font = `bold ${13 * k}px system-ui`; ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(0,0,0,.8)'; ctx.lineWidth = 3 * k;
+          const tx = cx + g.px * (len + 12 * k), ty = cy + g.py * (len + 12 * k);
+          ctx.strokeText(i + 1, tx, ty); ctx.fillText(i + 1, tx, ty);
+        }
+      });
+    }
+    if (pith){
+      for (const e of extras){
+        ctx.lineWidth = 2 * k; ctx.strokeStyle = 'rgba(120,200,255,.9)'; ctx.setLineDash([8 * k, 6 * k]);
+        ctx.beginPath(); ctx.moveTo(pith.x, pith.y); ctx.lineTo(e.pt.x, e.pt.y); ctx.stroke(); ctx.setLineDash([]);
+        if ($('showCurves').checked){
+          ctx.lineWidth = 1.2 * k; ctx.strokeStyle = 'rgba(120,200,255,.55)';
+          for (const c of e.curves){ ctx.beginPath(); c.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke(); }
+        }
+        dot(e.pt, '#78c8ff');
+        ctx.font = `bold ${15 * k}px system-ui`; ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.lineWidth = 3 * k;
+        const lbl = e.count == null ? '…' : String(e.count);
+        ctx.strokeText(lbl, e.pt.x + 10 * k, e.pt.y - 10 * k); ctx.fillText(lbl, e.pt.x + 10 * k, e.pt.y - 10 * k);
+      }
+    }
+    if (pith) dot(pith, '#e5383b');
+    if (bark) dot(bark, '#2f7fe0');
+  }
+
+  function drawProfile(){
+    const dpr = window.devicePixelRatio || 1, w = prof.clientWidth, h = prof.clientHeight;
+    prof.width = w * dpr; prof.height = h * dpr; pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    pctx.clearRect(0, 0, w, h);
+    if (!signal){ pctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--muted'); pctx.font = '13px system-ui'; pctx.fillText(t('profEmpty'), 12, h / 2); return; }
+    const n = signal.length; let mx = 0; for (const v of signal) mx = Math.max(mx, Math.abs(v));
+    mx = Math.max(mx, thr * 1.2, 1);
+    const X = i => i / (n - 1) * w, Y = v => h / 2 - v / mx * (h / 2 - 6);
+    pctx.strokeStyle = 'rgba(128,128,128,.5)'; pctx.setLineDash([4, 4]);
+    pctx.beginPath(); pctx.moveTo(0, Y(thr)); pctx.lineTo(w, Y(thr)); pctx.stroke(); pctx.setLineDash([]);
+    rings.forEach(t => {
+      const manual = manualAdd.some(m => Math.abs(m - t) < 0.5);
+      pctx.strokeStyle = manual ? 'rgba(56,224,255,.8)' : 'rgba(255,63,180,.55)'; pctx.lineWidth = 1;
+      pctx.beginPath(); pctx.moveTo(X(t), 0); pctx.lineTo(X(t), h); pctx.stroke();
+    });
+    pctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--accent'); pctx.lineWidth = 1.4;
+    pctx.beginPath(); for (let i = 0; i < n; i++){ const x = X(i), y = Y(signal[i]); i ? pctx.lineTo(x, y) : pctx.moveTo(x, y); } pctx.stroke();
+    pctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--muted'); pctx.font = '11px system-ui';
+    pctx.fillText(t('centre'), 4, h - 4); pctx.textAlign = 'right'; pctx.fillText(t('bark'), w - 4, h - 4); pctx.textAlign = 'left';
+  }
+
+  // ---------- results ----------
+  function updateResults(){
+    const has = !!signal;
+    const L = has ? signal.length - 1 : 0;
+    const bounds = has ? rings.concat([L]) : [];   // last ring ends at the bark
+    const N = bounds.length;
+    $('count').textContent = has ? N : '–';
+    const all = has ? [N].concat(extras.filter(e => e.count != null).map(e => e.count)) : [];
+    $('extraRow').style.display = extras.length ? 'flex' : 'none';
+    if (all.length > 1){
+      const srt = all.slice().sort((x, y) => x - y), mid = srt.length >> 1;
+      const med = srt.length % 2 ? srt[mid] : Math.round((srt[mid - 1] + srt[mid]) / 2);
+      $('multiRes').style.display = 'block'; $('medCount').textContent = med;
+      $('medLabel').textContent = t('medLabel', { n: all.length, a: srt[0], b: srt[srt.length - 1] });
+      const d = srt[srt.length - 1] - srt[0];
+      $('medWarn').style.display = d > Math.max(2, 0.1 * med) ? 'block' : 'none';
+      $('medWarn').textContent = t('medWarn', { d });
+    } else $('multiRes').style.display = 'none';
+    $('age').textContent = has ? N : '–';
+    $('copy').disabled = !has;
+    if (!has){ ['mean', 'last10', 'first10'].forEach(id => $(id).textContent = '–'); $('csv').style.display = 'none'; return; }
+    const cm = parseFloat(String($('lenCm').value).replace(',', '.'));
+    const mmPerPx = cm > 0 ? (cm * 10) / L : null;
+    const widths = bounds.map((t, i) => t - (i ? bounds[i - 1] : 0));
+    const fmt = px => mmPerPx ? (px * mmPerPx).toFixed(2) + ' mm' : px.toFixed(1) + ' px';
+    const avg = a => a.reduce((s, v) => s + v, 0) / a.length;
+    $('mean').textContent = fmt(avg(widths));
+    $('first10').textContent = fmt(avg(widths.slice(0, 10)));
+    $('last10').textContent = fmt(avg(widths.slice(-10)));
+    const yr = parseInt($('year').value, 10);
+    const lines = ['ring_from_centre,' + (yr ? 'year,' : '') + 'outer_edge_from_centre_px,width_px' + (mmPerPx ? ',outer_edge_mm,width_mm' : '')];
+    bounds.forEach((t, i) => {
+      const row = [i + 1];
+      if (yr) row.push(yr - (N - 1 - i) - ($('dormant').checked ? 1 : 0));
+      row.push(t.toFixed(1), widths[i].toFixed(1));
+      if (mmPerPx) row.push((t * mmPerPx).toFixed(2), (widths[i] * mmPerPx).toFixed(2));
+      lines.push(row.join(','));
+    });
+    $('csv').value = lines.join('\n');
+  }
+  $('copy').addEventListener('click', async () => {
+    const txt = $('csv').value;
+    try { await navigator.clipboard.writeText(txt); toast(t('copied')); }
+    catch (_) { const a = $('csv'); a.style.display = 'block'; a.focus(); a.select(); toast(t('copyManual')); }
+  });
+
+  applyLang();
+  if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+})();
+</script>
+</body>
+</html>
