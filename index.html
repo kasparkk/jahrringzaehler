@@ -79,16 +79,18 @@
       <div class="step" data-s="4" data-i18n="s4">4 Check rings</div>
     </div>
     <div class="row" style="margin-top:10px">
-      <label class="filebtn" for="file" data-i18n="photo">📷 Take / choose photo</label>
+      <label class="filebtn" for="cam" data-i18n="camB">📷 Camera</label>
+      <input type="file" id="cam" accept="image/*" capture="environment">
+      <label class="filebtn" for="file" data-i18n="photo">🖼 Choose photo</label>
       <input type="file" id="file" accept="image/*">
       <button id="demo" data-i18n="demo">Try demo disc</button>
       <button id="mPith" disabled data-i18n="setC">Set centre</button>
-      <button id="mAuto" disabled data-i18n="autoC">Find centre</button>
+      <button id="mAuto" disabled data-i18n="autoC">Auto</button>
       <button id="mBark" disabled data-i18n="setB">Set bark</button>
       <button id="mEdit" disabled data-i18n="edit">Edit rings</button>
       <button id="mExtra" disabled data-i18n="extraB">+ More directions</button>
     </div>
-    <label class="aibox"><input type="checkbox" id="ai"><span><b data-i18n="aiL">AI detection</b> <span class="lt" data-i18n="aiD">more accurate, loads ~25 MB once, takes a few seconds per line</span></span></label>
+    <label class="aibox"><input type="checkbox" id="ai"><span><b data-i18n="aiL">AI detection</b> <span class="lt" data-i18n="aiD">much more accurate, loads ~15 MB once, takes a few seconds per line</span></span></label>
     <div id="aiStatus" class="hint" style="display:none"></div>
     <p class="hint" id="hint" data-i18n="hint0">Start with a photo of the cut surface, taken straight on with even light.</p>
   </div>
@@ -207,9 +209,9 @@
   const I18N = {
     en: {
       title:'Tree Ring Counter',
-      intro:'Photo of a cut stump or disc, tap the centre and the bark, and the rings along that line are counted. Fix any misses by tapping.',
+      intro:'Photograph a cut stump or disc. The app finds the centre and the edge itself and counts the rings in several directions. Fix anything by tapping.',
       s1:'1 Photo', s2:'2 Tap centre (pith)', s3:'3 Tap bark', s4:'4 Check rings',
-      photo:'📷 Take / choose photo', demo:'Try demo disc', setC:'Set centre', setB:'Set bark', edit:'Edit rings',
+      photo:'🖼 Choose photo', camB:'📷 Camera', demo:'Try demo disc', setC:'Set centre', setB:'Set bark', edit:'Edit rings',
       hint0:'Start with a photo of the cut surface, taken straight on with even light.',
       empty:'No photo yet.<br>Use “Take / choose photo” or try the demo disc.', fit:'Fit',
       result:'Result', ringsCounted:'rings counted', kAge:'age at this height (years)', kMean:'mean ring width',
@@ -240,17 +242,17 @@
       removed:'Ring removed', added:'Ring added', onLine:'Tap on the yellow line', backAuto:'Back to automatic count',
       copied:'Table copied', copyManual:'Select all and copy the text below',
       profEmpty:'Set centre and bark to see the profile', centre:'centre', bark:'bark', other:'DE',
-      extraB:'+ More directions', autoC:'Find centre', autoOk:'Centre found automatically. Check it; tap “Set centre” to move it.', autoFail:'Could not find the centre, please tap it', clearExtra:'Remove extra directions',
+      extraB:'+ More directions', autoC:'Auto (centre + all round)', autoOk:'Centre and disc edge found automatically. Check the red dot and the blue lines; move them by tapping if needed.', autoNoEdge:'Disc edge not found, please tap the bark', autoFail:'Could not find the centre, please tap it', clearExtra:'Remove extra directions',
       hExtra:'<b>Tap the bark in other directions</b> (avoid cracks). Each line is counted on its own; the middle value of all lines is the most reliable count.',
-      medLabel:'middle value of {n} directions (range {a}–{b})', aiL:'AI detection', aiD:'more accurate, loads ~25 MB once, takes a few seconds per line',
+      medLabel:'middle value of {n} directions (range {a}–{b})', aiL:'AI detection', aiD:'much more accurate, loads ~15 MB once, takes a few seconds per line',
       aiLoading:'Loading AI model…', aiReady:'AI model ready', aiFail:'AI model could not be loaded ({e}). Using the classic method.', aiRun:'AI is reading the wood… {p}',
       aiNote:'AI mode: trained on pine discs and hardwood samples. With AI on, “Sensitivity” and “Min. ring spacing” still apply; strip width and boundary type do not.'
     },
     de: {
       title:'Jahrringzähler',
-      intro:'Foto von einem Stubben oder einer Stammscheibe machen, Mitte und Rinde antippen, und die Jahrringe entlang der Linie werden gezählt. Fehler korrigierst du per Antippen.',
+      intro:'Stubben oder Stammscheibe fotografieren. Die App findet Mitte und Rand selbst und zählt die Jahrringe in mehreren Richtungen. Korrigieren geht per Antippen.',
       s1:'1 Foto', s2:'2 Mitte (Mark) antippen', s3:'3 Rinde antippen', s4:'4 Ringe prüfen',
-      photo:'📷 Foto aufnehmen / wählen', demo:'Demo-Scheibe testen', setC:'Mitte setzen', setB:'Rinde setzen', edit:'Ringe bearbeiten',
+      photo:'🖼 Foto wählen', camB:'📷 Kamera', demo:'Demo-Scheibe testen', setC:'Mitte setzen', setB:'Rinde setzen', edit:'Ringe bearbeiten',
       hint0:'Starte mit einem Foto der Schnittfläche, gerade von oben und gleichmäßig beleuchtet.',
       empty:'Noch kein Foto.<br>„Foto aufnehmen / wählen“ oder die Demo-Scheibe testen.', fit:'Einpassen',
       result:'Ergebnis', ringsCounted:'Jahrringe gezählt', kAge:'Alter auf Schnitthöhe (Jahre)', kMean:'mittlere Jahrringbreite',
@@ -281,9 +283,9 @@
       removed:'Ring entfernt', added:'Ring hinzugefügt', onLine:'Auf die gelbe Linie tippen', backAuto:'Zurück zur automatischen Zählung',
       copied:'Tabelle kopiert', copyManual:'Text unten markieren und kopieren',
       profEmpty:'Mitte und Rinde setzen, um das Profil zu sehen', centre:'Mitte', bark:'Rinde', other:'EN',
-      extraB:'+ Weitere Richtungen', autoC:'Mitte finden', autoOk:'Mitte automatisch gesetzt. Bitte prüfen, mit „Mitte setzen“ verschieben.', autoFail:'Mitte nicht gefunden, bitte antippen', clearExtra:'Weitere Richtungen löschen',
+      extraB:'+ Weitere Richtungen', autoC:'Auto (Mitte + rundum)', autoOk:'Mitte und Scheibenrand automatisch gefunden. Roten Punkt und blaue Linien prüfen, bei Bedarf per Antippen versetzen.', autoNoEdge:'Scheibenrand nicht gefunden, bitte Rinde antippen', autoFail:'Mitte nicht gefunden, bitte antippen', clearExtra:'Weitere Richtungen löschen',
       hExtra:'<b>Tippe in anderen Richtungen auf die Rinde</b> (Risse meiden). Jede Linie wird einzeln gezählt, der Mittelwert aller Linien ist die verlässlichste Zahl.',
-      medLabel:'Mittelwert aus {n} Richtungen (Spanne {a}–{b})', aiL:'KI-Erkennung', aiD:'genauer, lädt einmalig ca. 25 MB, braucht ein paar Sekunden pro Linie',
+      medLabel:'Mittelwert aus {n} Richtungen (Spanne {a}–{b})', aiL:'KI-Erkennung', aiD:'deutlich genauer, lädt einmalig ca. 15 MB, braucht ein paar Sekunden pro Linie',
       aiLoading:'KI-Modell wird geladen…', aiReady:'KI-Modell bereit', aiFail:'KI-Modell konnte nicht geladen werden ({e}). Es wird die klassische Methode genutzt.', aiRun:'KI liest das Holz… {p}',
       aiNote:'KI-Modus: trainiert an Kiefernscheiben und Laubholzproben. „Empfindlichkeit“ und „Min. Ringabstand“ wirken weiter, Streifenbreite und Grenztyp nicht.'
     }
@@ -343,10 +345,29 @@
     let p = null; try { p = autoPith(); } catch (_) {}
     if (!p){ toast(t('autoFail')); return; }
     pith = p; $('mBark').disabled = false;
-    if (bark){ manualAdd = []; manualRemove = []; detect(); setMode('edit'); } else setMode('bark');
     render(); toast(t('autoOk'));
+    runAutoCount();
+  }
+  function runAutoCount(){
+    if (!pith) return;
+    let pts = []; try { pts = autoBarks(6); } catch (_) {}
+    if (!pts.length){ setMode('bark'); toast(t('autoNoEdge')); return; }
+    bark = pts[0]; extras = pts.slice(1).map(pt => ({ pt, count: null, curves: [] }));
+    manualAdd = []; manualRemove = []; $('reset').disabled = true;
+    $('mEdit').disabled = false; $('mExtra').disabled = false;
+    setMode('edit'); detect();
   }
 
+  $('cam').addEventListener('change', e => { $('file').onchange_(e); });
+  $('file').onchange_ = e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const url = URL.createObjectURL(f);
+    const im = new Image();
+    im.onload = () => { loadFromCanvas(im); URL.revokeObjectURL(url); };
+    im.onerror = () => toast(t('badImg'));
+    im.src = url;
+    e.target.value = '';
+  };
   $('file').addEventListener('change', e => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
     const url = URL.createObjectURL(f);
@@ -843,6 +864,77 @@
     return { x: px, y: py };
   }
 
+  // ---------- automatic disc edge ----------
+  // colour clusters that dominate the photo border (and not the centre) are background;
+  // the wood is the connected region around the pith, with holes (cracks, stains) filled.
+  function discEdges(p, nang){
+    const N = 300, s = N / Math.max(W, H), w = Math.max(8, Math.round(W * s)), h = Math.max(8, Math.round(H * s));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const cx = c.getContext('2d', { willReadFrequently: true }); cx.imageSmoothingQuality = 'high';
+    cx.filter = 'blur(1.5px)'; cx.drawImage(base, 0, 0, w, h);
+    const d = cx.getImageData(0, 0, w, h).data, n = w * h, F = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++){ const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], L = (r + g + b) / 3; F[i * 4] = r - L; F[i * 4 + 1] = g - L; F[i * 4 + 2] = b - L; F[i * 4 + 3] = 0.5 * L; }
+    // k-means (k = 6), deterministic k-means++ start
+    const k = 6, C = new Float32Array(k * 4), lab = new Uint8Array(n);
+    let seed = 1; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const dist = (i, j) => { let s2 = 0; for (let q = 0; q < 4; q++){ const v = F[i * 4 + q] - C[j * 4 + q]; s2 += v * v; } return s2; };
+    { const i0 = Math.floor(rnd() * n); for (let q = 0; q < 4; q++) C[q] = F[i0 * 4 + q]; }
+    const dm = new Float32Array(n).fill(Infinity);
+    for (let j = 1; j < k; j++){
+      let tot = 0; for (let i = 0; i < n; i++){ dm[i] = Math.min(dm[i], dist(i, j - 1)); tot += dm[i]; }
+      let r = rnd() * tot, pick = n - 1; for (let i = 0; i < n; i++){ r -= dm[i]; if (r <= 0){ pick = i; break; } }
+      for (let q = 0; q < 4; q++) C[j * 4 + q] = F[pick * 4 + q];
+    }
+    for (let it = 0; it < 15; it++){
+      const S = new Float64Array(k * 4), cnt = new Float64Array(k);
+      for (let i = 0; i < n; i++){ let best = 0, bd = Infinity; for (let j = 0; j < k; j++){ const v = dist(i, j); if (v < bd){ bd = v; best = j; } } lab[i] = best; cnt[best]++; for (let q = 0; q < 4; q++) S[best * 4 + q] += F[i * 4 + q]; }
+      for (let j = 0; j < k; j++) if (cnt[j]) for (let q = 0; q < 4; q++) C[j * 4 + q] = S[j * 4 + q] / cnt[j];
+    }
+    const px = p.x * s, py = p.y * s, b = Math.max(2, Math.round(0.03 * N));
+    const bc = new Float64Array(k), nc = new Float64Array(k); let bt = 0, nt = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
+      const i = y * w + x;
+      if (x < b || y < b || x >= w - b || y >= h - b){ bc[lab[i]]++; bt++; }
+      if (Math.hypot(x - px, y - py) < 0.06 * N){ nc[lab[i]]++; nt++; }
+    }
+    let m = new Uint8Array(n);
+    for (let i = 0; i < n; i++){ const l = lab[i]; m[i] = (bc[l] / bt > 0.1 && nc[l] / Math.max(1, nt) < 0.05) ? 0 : 1; }
+    const morph = (a, dil) => { const o = new Uint8Array(n); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){ const i = y * w + x; let v = a[i]; const nb = [x > 0 ? a[i - 1] : 0, x < w - 1 ? a[i + 1] : 0, y > 0 ? a[i - w] : 0, y < h - 1 ? a[i + w] : 0]; for (const q of nb) v = dil ? (v | q) : (v & q); o[i] = v; } return o; };
+    const rep = (a, dil, t) => { for (let q = 0; q < t; q++) a = morph(a, dil); return a; };
+    const flood = (a, sx, sy, val) => { const o = new Uint8Array(n); if (sx < 0 || sy < 0 || sx >= w || sy >= h || a[sy * w + sx] !== val) return o; const st = [sy * w + sx]; o[st[0]] = 1; while (st.length){ const i = st.pop(), x = i % w, y = (i / w) | 0; for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1]) if (j >= 0 && !o[j] && a[j] === val){ o[j] = 1; st.push(j); } } return o; };
+    const fillHoles = a => { const inv = new Uint8Array(n); for (let i = 0; i < n; i++) inv[i] = a[i] ? 0 : 1; const outside = new Uint8Array(n); for (let x = 0; x < w; x++) for (const y of [0, h - 1]){ if (inv[y * w + x] && !outside[y * w + x]){ const f = flood(inv, x, y, 1); for (let i = 0; i < n; i++) if (f[i]) outside[i] = 1; } } for (let y = 0; y < h; y++) for (const x of [0, w - 1]){ if (inv[y * w + x] && !outside[y * w + x]){ const f = flood(inv, x, y, 1); for (let i = 0; i < n; i++) if (f[i]) outside[i] = 1; } } const o = new Uint8Array(n); for (let i = 0; i < n; i++) o[i] = outside[i] ? 0 : 1; return o; };
+    m = rep(rep(m, false, 2), true, 2);                       // opening
+    m = flood(m, Math.round(px), Math.round(py), 1);          // component around the pith
+    m = rep(rep(m, true, 3), false, 3);                       // closing
+    m = fillHoles(m);
+    const R = [], border = [];
+    for (let a = 0; a < nang; a++){
+      const th = 2 * Math.PI * a / nang, ux = Math.cos(th), uy = Math.sin(th); let r = 0;
+      while (true){ const x = Math.round(px + ux * (r + 1)), y = Math.round(py + uy * (r + 1)); if (x < 0 || y < 0 || x >= w || y >= h || !m[y * w + x]) break; r++; }
+      const ex = px + ux * r, ey = py + uy * r;
+      R.push(r / s); border.push(ex < 0.02 * w + 1 || ey < 0.02 * h + 1 || ex > w - 0.02 * w - 2 || ey > h - 0.02 * h - 2);
+    }
+    const Rs = R.map((_, a) => { const v = []; for (let q = -2; q <= 2; q++) v.push(R[(a + q + nang) % nang]); return v.sort((x, y) => x - y)[2]; });
+    return { R: Rs, border };
+  }
+  // pick evenly spread directions with a trustworthy edge; bark point slightly inside the edge
+  function autoBarks(count){
+    const nang = 72, E = discEdges(pith, nang), out = [];
+    const med = E.R.slice().sort((x, y) => x - y)[nang >> 1];
+    for (let q = 0; q < count; q++){
+      let best = null;
+      for (let o = 0; o < nang / count; o++){
+        const a = (Math.round(q * nang / count) + (o % 2 ? -1 : 1) * Math.ceil(o / 2) + nang) % nang;
+        if (E.border[a] || E.R[a] < 0.4 * med || E.R[a] > 1.6 * med) continue;
+        best = a; break;
+      }
+      if (best === null) continue;
+      const th = 2 * Math.PI * best / nang, r = 0.99 * E.R[best];
+      if (r > 20) out.push({ x: pith.x + Math.cos(th) * r, y: pith.y + Math.sin(th) * r });
+    }
+    return out;
+  }
+
   // ---------- interaction ----------
   let downAt = null;
   cv.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY }; });
@@ -876,6 +968,9 @@
   $('mEdit').addEventListener('click', () => { if (bark) setMode('edit'); });
   $('mExtra').addEventListener('click', () => { if (bark) setMode('extra'); });
   $('clearExtra').addEventListener('click', () => { extras = []; render(); updateResults(); if (mode === 'extra') setMode('edit'); });
+  try { $('ai').checked = localStorage.getItem('ringAI') !== 'off'; } catch (_) { $('ai').checked = true; }
+  $('aiNote').style.display = $('ai').checked ? 'block' : 'none';
+  $('ai').addEventListener('change', () => { try { localStorage.setItem('ringAI', $('ai').checked ? 'on' : 'off'); } catch (_) {} });
   $('ai').addEventListener('change', () => { $('aiNote') && ($('aiNote').style.display = $('ai').checked ? 'block' : 'none'); detect(); });
 
   prof.addEventListener('click', e => {
