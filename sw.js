@@ -1,5 +1,5 @@
 // Offline support: app shell is cached on install; the AI model and TensorFlow.js are cached the first time AI mode is used.
-const SHELL = 'shell-v1', RUNTIME = 'runtime-v1';
+const SHELL = 'shell-v2', RUNTIME = 'runtime-v1';
 const SHELL_FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(SHELL_FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
