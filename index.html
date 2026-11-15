@@ -83,6 +83,7 @@
       <input type="file" id="file" accept="image/*">
       <button id="demo" data-i18n="demo">Try demo disc</button>
       <button id="mPith" disabled data-i18n="setC">Set centre</button>
+      <button id="mAuto" disabled data-i18n="autoC">Find centre</button>
       <button id="mBark" disabled data-i18n="setB">Set bark</button>
       <button id="mEdit" disabled data-i18n="edit">Edit rings</button>
       <button id="mExtra" disabled data-i18n="extraB">+ More directions</button>
@@ -239,7 +240,7 @@
       removed:'Ring removed', added:'Ring added', onLine:'Tap on the yellow line', backAuto:'Back to automatic count',
       copied:'Table copied', copyManual:'Select all and copy the text below',
       profEmpty:'Set centre and bark to see the profile', centre:'centre', bark:'bark', other:'DE',
-      extraB:'+ More directions', clearExtra:'Remove extra directions',
+      extraB:'+ More directions', autoC:'Find centre', autoOk:'Centre found automatically. Check it; tap “Set centre” to move it.', autoFail:'Could not find the centre, please tap it', clearExtra:'Remove extra directions',
       hExtra:'<b>Tap the bark in other directions</b> (avoid cracks). Each line is counted on its own; the middle value of all lines is the most reliable count.',
       medLabel:'middle value of {n} directions (range {a}–{b})', aiL:'AI detection', aiD:'more accurate, loads ~25 MB once, takes a few seconds per line',
       aiLoading:'Loading AI model…', aiReady:'AI model ready', aiFail:'AI model could not be loaded ({e}). Using the classic method.', aiRun:'AI is reading the wood… {p}',
@@ -280,7 +281,7 @@
       removed:'Ring entfernt', added:'Ring hinzugefügt', onLine:'Auf die gelbe Linie tippen', backAuto:'Zurück zur automatischen Zählung',
       copied:'Tabelle kopiert', copyManual:'Text unten markieren und kopieren',
       profEmpty:'Mitte und Rinde setzen, um das Profil zu sehen', centre:'Mitte', bark:'Rinde', other:'EN',
-      extraB:'+ Weitere Richtungen', clearExtra:'Weitere Richtungen löschen',
+      extraB:'+ Weitere Richtungen', autoC:'Mitte finden', autoOk:'Mitte automatisch gesetzt. Bitte prüfen, mit „Mitte setzen“ verschieben.', autoFail:'Mitte nicht gefunden, bitte antippen', clearExtra:'Weitere Richtungen löschen',
       hExtra:'<b>Tippe in anderen Richtungen auf die Rinde</b> (Risse meiden). Jede Linie wird einzeln gezählt, der Mittelwert aller Linien ist die verlässlichste Zahl.',
       medLabel:'Mittelwert aus {n} Richtungen (Spanne {a}–{b})', aiL:'KI-Erkennung', aiD:'genauer, lädt einmalig ca. 25 MB, braucht ein paar Sekunden pro Linie',
       aiLoading:'KI-Modell wird geladen…', aiReady:'KI-Modell bereit', aiFail:'KI-Modell konnte nicht geladen werden ({e}). Es wird die klassische Methode genutzt.', aiRun:'KI liest das Holz… {p}',
@@ -335,6 +336,15 @@
     ['mPith', 'mBark', 'mEdit'].forEach(id => $(id).disabled = false);
     $('mBark').disabled = true; $('mEdit').disabled = true; $('mExtra').disabled = true;
     fit(); setMode('pith'); render(); updateResults();
+    $('mAuto').disabled = false;
+    setTimeout(runAutoPith, 30);
+  }
+  function runAutoPith(){
+    let p = null; try { p = autoPith(); } catch (_) {}
+    if (!p){ toast(t('autoFail')); return; }
+    pith = p; $('mBark').disabled = false;
+    if (bark){ manualAdd = []; manualRemove = []; detect(); setMode('edit'); } else setMode('bark');
+    render(); toast(t('autoOk'));
   }
 
   $('file').addEventListener('change', e => {
@@ -753,6 +763,86 @@
     combine();
   }
 
+  // ---------- automatic pith (centre) detection ----------
+  // ring boundaries are locally straight; their gradient points along the radius, so all
+  // gradient lines cross near the pith. Robust least-squares intersection, then a zoomed second pass.
+  function grayOf(sx, sy, sw, sh, N){
+    const s = N / Math.max(sw, sh), w = Math.max(8, Math.round(sw * s)), h = Math.max(8, Math.round(sh * s));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingQuality = 'high';
+    x.drawImage(base, sx, sy, sw, sh, 0, 0, w, h);
+    const d = x.getImageData(0, 0, w, h).data, g = new Float32Array(w * h);
+    for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = 0.299 * d[j] + 0.587 * d[j + 1] + 0.114 * d[j + 2];
+    return { g, w, h, s };
+  }
+  function blur2(a, w, h, sigma){
+    const r = Math.ceil(sigma * 3), k = []; let ks = 0;
+    for (let i = -r; i <= r; i++){ const v = Math.exp(-i * i / (2 * sigma * sigma)); k.push(v); ks += v; }
+    for (let i = 0; i < k.length; i++) k[i] /= ks;
+    const t = new Float32Array(w * h), o = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){ let s = 0; for (let j = -r; j <= r; j++){ const xx = Math.min(w - 1, Math.max(0, x + j)); s += a[y * w + xx] * k[j + r]; } t[y * w + x] = s; }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){ let s = 0; for (let j = -r; j <= r; j++){ const yy = Math.min(h - 1, Math.max(0, y + j)); s += t[yy * w + x] * k[j + r]; } o[y * w + x] = s; }
+    return o;
+  }
+  function pithFeatures(G){
+    const { w, h } = G, g = blur2(G.g, w, h, 1);
+    const gx = new Float32Array(w * h), gy = new Float32Array(w * h);
+    const P = (x, y) => g[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
+      gx[y * w + x] = (P(x + 1, y - 1) + 2 * P(x + 1, y) + P(x + 1, y + 1)) - (P(x - 1, y - 1) + 2 * P(x - 1, y) + P(x - 1, y + 1));
+      gy[y * w + x] = (P(x - 1, y + 1) + 2 * P(x, y + 1) + P(x + 1, y + 1)) - (P(x - 1, y - 1) + 2 * P(x, y - 1) + P(x + 1, y - 1));
+    }
+    const xx = new Float32Array(w * h), yy = new Float32Array(w * h), xy = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++){ xx[i] = gx[i] * gx[i]; yy[i] = gy[i] * gy[i]; xy[i] = gx[i] * gy[i]; }
+    const Jxx = blur2(xx, w, h, 3), Jyy = blur2(yy, w, h, 3), Jxy = blur2(xy, w, h, 3);
+    const n = w * h, T = new Float32Array(n), Wt = new Float32Array(n);
+    for (let i = 0; i < n; i++){
+      const a = Jxx[i] - Jyy[i], b = 2 * Jxy[i], tr = Jxx[i] + Jyy[i] + 1e-6, lam = Math.sqrt(a * a + b * b);
+      T[i] = 0.5 * Math.atan2(b, a); Wt[i] = (lam / tr) * Math.sqrt(tr);
+    }
+    const srt = Float32Array.from(Wt).sort(), q = srt[Math.floor(n * 0.7)];
+    const F = { x: [], y: [], nx: [], ny: [], w: [] };
+    for (let i = 0; i < n; i++) if (Wt[i] > q){ F.x.push(i % w); F.y.push((i / w) | 0); F.nx.push(-Math.sin(T[i])); F.ny.push(Math.cos(T[i])); F.w.push(Wt[i]); }
+    return F;
+  }
+  function pithIterate(F, est, N){
+    let win = 0.5 * N, sig = 0.1 * N, w0 = null;
+    for (let it = 0; it < 25; it++){
+      let a = 0, b = 0, c = 0, bx = 0, by = 0, ws = 0;
+      for (let i = 0; i < F.x.length; i++){
+        const dx = est[0] - F.x[i], dy = est[1] - F.y[i], r = Math.hypot(dx, dy);
+        if (r >= win || r <= 2) continue;
+        const nx = F.nx[i], ny = F.ny[i], d = nx * dx + ny * dy;
+        const ww = F.w[i] * Math.exp(-(d / sig) * (d / sig)); if (!ww) continue;
+        const pr = nx * F.x[i] + ny * F.y[i];
+        a += ww * nx * nx; b += ww * nx * ny; c += ww * ny * ny; bx += ww * nx * pr; by += ww * ny * pr; ws += ww;
+      }
+      if (w0 === null) w0 = ws;
+      if (ws < 0.02 * w0) break;
+      a += 1e-6; c += 1e-6;
+      const det = a * c - b * b; if (Math.abs(det) < 1e-12) break;
+      est = [(c * bx - b * by) / det, (a * by - b * bx) / det];
+      win = Math.max(0.25 * N, win * 0.85); sig = Math.max(0.01 * N, sig * 0.8);
+    }
+    return est;
+  }
+  function autoPith(){
+    const N = 480;
+    const G1 = grayOf(0, 0, W, H, N);
+    let e = pithIterate(pithFeatures(G1), [G1.w / 2, G1.h / 2], N);
+    let px = e[0] / G1.s, py = e[1] / G1.s;
+    const half = 0.125 * Math.max(W, H);
+    const x0 = Math.max(0, Math.floor(px - half)), y0 = Math.max(0, Math.floor(py - half));
+    const x1 = Math.min(W, Math.floor(px + half)), y1 = Math.min(H, Math.floor(py + half));
+    if (x1 - x0 > 16 && y1 - y0 > 16){
+      const G2 = grayOf(x0, y0, x1 - x0, y1 - y0, N);
+      const e2 = pithIterate(pithFeatures(G2), [(px - x0) * G2.s, (py - y0) * G2.s], N);
+      px = e2[0] / G2.s + x0; py = e2[1] / G2.s + y0;
+    }
+    if (!isFinite(px) || !isFinite(py) || px < 0 || py < 0 || px >= W || py >= H) return null;
+    return { x: px, y: py };
+  }
+
   // ---------- interaction ----------
   let downAt = null;
   cv.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY }; });
@@ -781,6 +871,7 @@
     }
   });
   $('mPith').addEventListener('click', () => setMode('pith'));
+  $('mAuto').addEventListener('click', () => { if (base) runAutoPith(); });
   $('mBark').addEventListener('click', () => setMode('bark'));
   $('mEdit').addEventListener('click', () => { if (bark) setMode('edit'); });
   $('mExtra').addEventListener('click', () => { if (bark) setMode('extra'); });
