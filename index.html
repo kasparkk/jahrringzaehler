@@ -133,6 +133,7 @@
     </div>
     <div class="row" style="margin-top:10px">
       <button id="copy" disabled data-i18n="copy">Copy table (CSV)</button>
+      <button id="xlsx" disabled data-i18n="xlsx">Download Excel</button>
       <button id="reset" disabled data-i18n="reset">Undo my edits</button>
     </div>
     <textarea id="csv" readonly style="display:none;margin-top:8px"></textarea>
@@ -241,6 +242,7 @@
       badImg:'Could not read that image', demoHas:'Demo disc has {n} rings', short:'Line too short',
       removed:'Ring removed', added:'Ring added', onLine:'Tap on the yellow line', backAuto:'Back to automatic count',
       copied:'Table copied', copyManual:'Select all and copy the text below',
+      xlsx:'Download Excel', xlsxSaved:'Excel file saved', xlsxFail:'Excel export needs an internet connection the first time',
       profEmpty:'Set centre and bark to see the profile', centre:'centre', bark:'bark', other:'DE',
       extraB:'+ More directions', autoC:'Auto (centre + all round)', autoOk:'Centre and disc edge found automatically. Check the red dot and the blue lines; move them by tapping if needed.', autoNoEdge:'Disc edge not found, please tap the bark', autoFail:'Could not find the centre, please tap it', clearExtra:'Remove extra directions',
       hExtra:'<b>Tap the bark in other directions</b> (avoid cracks). Each line is counted on its own; the middle value of all lines is the most reliable count.',
@@ -282,6 +284,7 @@
       badImg:'Bild konnte nicht gelesen werden', demoHas:'Die Demo-Scheibe hat {n} Ringe', short:'Linie zu kurz',
       removed:'Ring entfernt', added:'Ring hinzugefügt', onLine:'Auf die gelbe Linie tippen', backAuto:'Zurück zur automatischen Zählung',
       copied:'Tabelle kopiert', copyManual:'Text unten markieren und kopieren',
+      xlsx:'Excel herunterladen', xlsxSaved:'Excel-Datei gespeichert', xlsxFail:'Der Excel-Export braucht beim ersten Mal Internet',
       profEmpty:'Mitte und Rinde setzen, um das Profil zu sehen', centre:'Mitte', bark:'Rinde', other:'EN',
       extraB:'+ Weitere Richtungen', autoC:'Auto (Mitte + rundum)', autoOk:'Mitte und Scheibenrand automatisch gefunden. Roten Punkt und blaue Linien prüfen, bei Bedarf per Antippen versetzen.', autoNoEdge:'Scheibenrand nicht gefunden, bitte Rinde antippen', autoFail:'Mitte nicht gefunden, bitte antippen', clearExtra:'Weitere Richtungen löschen',
       hExtra:'<b>Tippe in anderen Richtungen auf die Rinde</b> (Risse meiden). Jede Linie wird einzeln gezählt, der Mittelwert aller Linien ist die verlässlichste Zahl.',
@@ -305,6 +308,7 @@
   }
   $('lang').addEventListener('click', () => { lang = lang === 'de' ? 'en' : 'de'; try { localStorage.setItem('ringLang', lang); } catch (_) {} applyLang(); });
 
+  let tabelle = null; // zuletzt berechnete Ergebnistabelle (Kopf + Zeilen)
   const toast = msg => { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 1800); };
 
   function setStep(n){ document.querySelectorAll('.step').forEach(s => s.classList.toggle('on', +s.dataset.s === n)); }
@@ -1081,7 +1085,8 @@
     } else $('multiRes').style.display = 'none';
     $('age').textContent = has ? N : '–';
     $('copy').disabled = !has;
-    if (!has){ ['mean', 'last10', 'first10'].forEach(id => $(id).textContent = '–'); $('csv').style.display = 'none'; return; }
+    $('xlsx').disabled = !has;
+    if (!has){ ['mean', 'last10', 'first10'].forEach(id => $(id).textContent = '–'); $('csv').style.display = 'none'; tabelle = null; return; }
     const cm = parseFloat(String($('lenCm').value).replace(',', '.'));
     const mmPerPx = cm > 0 ? (cm * 10) / L : null;
     const widths = bounds.map((t, i) => t - (i ? bounds[i - 1] : 0));
@@ -1091,16 +1096,34 @@
     $('first10').textContent = fmt(avg(widths.slice(0, 10)));
     $('last10').textContent = fmt(avg(widths.slice(-10)));
     const yr = parseInt($('year').value, 10);
-    const lines = ['ring_from_centre,' + (yr ? 'year,' : '') + 'outer_edge_from_centre_px,width_px' + (mmPerPx ? ',outer_edge_mm,width_mm' : '')];
+    // Eine Tabelle fuer beide Ausgaben: CSV zum Kopieren, Excel zum Herunterladen.
+    // Zahlen bleiben Zahlen, damit Excel damit rechnen kann.
+    tabelle = [('ring_from_centre,' + (yr ? 'year,' : '') + 'outer_edge_from_centre_px,width_px' + (mmPerPx ? ',outer_edge_mm,width_mm' : '')).split(',')];
     bounds.forEach((t, i) => {
       const row = [i + 1];
       if (yr) row.push(yr - (N - 1 - i) - ($('dormant').checked ? 1 : 0));
-      row.push(t.toFixed(1), widths[i].toFixed(1));
-      if (mmPerPx) row.push((t * mmPerPx).toFixed(2), (widths[i] * mmPerPx).toFixed(2));
-      lines.push(row.join(','));
+      row.push(+t.toFixed(1), +widths[i].toFixed(1));
+      if (mmPerPx) row.push(+(t * mmPerPx).toFixed(2), +(widths[i] * mmPerPx).toFixed(2));
+      tabelle.push(row);
     });
-    $('csv').value = lines.join('\n');
+    // Nachkommastellen je Spalte fuer die CSV, wie bisher: Nummer/Jahr ganz, px 1, mm 2.
+    const stellen = [0, ...(yr ? [0] : []), 1, 1, ...(mmPerPx ? [2, 2] : [])];
+    $('csv').value = tabelle.map(row => row.map((v, j) => typeof v === 'number' ? v.toFixed(stellen[j]) : v).join(',')).join('\n');
   }
+  /* Excel-Datei ueber den Baustein "export" (github.com/kasparkk/bausteine),
+     auf eine Version festgelegt. Geladen wird er erst beim ersten Antippen;
+     der Service Worker legt ihn dann ab, danach geht es auch offline. */
+  const BAUSTEIN_EXPORT = 'https://cdn.jsdelivr.net/gh/kasparkk/bausteine@06eaea3e4cee6c3d1e27dc63c7b9ca10d922eee4/export.js';
+  $('xlsx').addEventListener('click', async () => {
+    if (!tabelle) return;
+    let baustein;
+    try { baustein = await import(BAUSTEIN_EXPORT); }
+    catch (_) { toast(t('xlsxFail')); return; }
+    const blob = baustein.baueXlsx(tabelle, lang === 'de' ? 'Jahrringe' : 'Tree rings');
+    const name = (lang === 'de' ? 'jahrringe' : 'tree-rings') + '.xlsx';
+    if ((await baustein.weitergeben(blob, name, document.title)) === 'gespeichert') toast(t('xlsxSaved'));
+  });
+
   $('copy').addEventListener('click', async () => {
     const txt = $('csv').value;
     try { await navigator.clipboard.writeText(txt); toast(t('copied')); }
