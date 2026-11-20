@@ -1,10 +1,10 @@
 {
-  "id": "/jahrringzaehler/",
+  "id": "./",
   "name": "Jahrringzähler / Tree Ring Counter",
   "short_name": "Jahrringe",
   "description": "Count tree rings from a photo of a stump or disc.",
-  "start_url": "/jahrringzaehler/",
-  "scope": "/jahrringzaehler/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#f4f1ea",
   "theme_color": "#2f5e3e",
