@@ -8,3 +8,7 @@ Installable web app: photograph a stump or disc, tap the centre and the bark, an
 - Works offline after the first visit (service worker).
 
 Open: https://kasparkk.github.io/jahrringzaehler/
+
+## Licence
+
+MIT, see [LICENSE](LICENSE). The AI model builds on DeepCS-TRD (MIT), UruDendro2 (CC BY 4.0) and the Purdue hardwood growth-ring dataset (MIT), credited above.
